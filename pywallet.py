@@ -27,7 +27,7 @@ import exceptions
 import hashlib
 import random
 
-max_version = 32400
+max_version = 32500
 addrtype = 0
 json_db = {}
 private_keys = []
