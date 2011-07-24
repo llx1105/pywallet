@@ -543,11 +543,11 @@ class BCDataStream(object):
 		s = struct.pack(format, num)
 		self.write(s)
 
-def open_wallet(db_env, writable=False):
+def open_wallet(db_env, walletfile, writable=False):
 	db = DB(db_env)
 	flags = DB_THREAD | (DB_CREATE if writable else DB_RDONLY)
 	try:
-		r = db.open("wallet.dat", "main", DB_BTREE, flags)
+		r = db.open(walletfile, "main", DB_BTREE, flags)
 	except DBError:
 		r = True
 
@@ -698,8 +698,8 @@ def update_wallet(db, type, data):
 		print("data dictionary: %r"%data)
 		traceback.print_exc()
 
-def rewrite_wallet(db_env, destFileName, pre_put_callback=None):
-	db = open_wallet(db_env)
+def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
+	db = open_wallet(db_env, walletfile)
 
 	db_out = DB(db_env)
 	try:
@@ -719,8 +719,8 @@ def rewrite_wallet(db_env, destFileName, pre_put_callback=None):
 	db_out.close()
 	db.close()
 
-def read_wallet(json_db, db_env, print_wallet, print_wallet_transactions, transaction_filter):
-	db = open_wallet(db_env)
+def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter):
+	db = open_wallet(db_env, walletfile)
 
 	json_db['keys'] = []
 	json_db['pool'] = []
@@ -817,6 +817,10 @@ def main():
 	parser.add_option("--datadir", dest="datadir", 
 		help="wallet directory (defaults to bitcoin default)")
 
+	parser.add_option("--wallet", dest="walletfile", 
+		help="wallet filename (defaults to wallet.dat)",
+		default="wallet.dat")
+
 	parser.add_option("--testnet", dest="testnet", action="store_true",
 		help="use testnet subdirectory and address type")
 
@@ -838,7 +842,7 @@ def main():
 
 	db_env = create_env(db_dir)
 
-	read_wallet(json_db, db_env, True, True, "")
+	read_wallet(json_db, db_env, options.walletfile, True, True, "")
 
 	if options.dump:		
 		print json.dumps(json_db, sort_keys=True, indent=4)
@@ -848,7 +852,7 @@ def main():
 		elif options.key in private_keys:
 			print "Already exists"
 		else:	
-			db = open_wallet(db_env, writable=True)
+			db = open_wallet(db_env, options.walletfile, writable=True)
 
 			if importprivkey(db, options.key):
 				print "Imported successfully"
