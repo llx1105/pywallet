@@ -6,5 +6,9 @@ Options:
   --dumpwallet         dump wallet in json format
   --importprivkey=KEY  import private key from vanitygen
   --datadir=DATADIR    wallet directory (defaults to bitcoin default)
+  --wallet=WALLETFILE  wallet filename (defaults to wallet.dat)
+  --label=LABEL        label shown in the adress book (defaults to '')
   --testnet            use testnet subdirectory and address type
-  --wallet             wallet filename (defaults to wallet.dat)
+  --reserve            import as a reserve key, i.e. it won't show in the
+                       adress book
+

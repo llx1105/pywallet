@@ -3,15 +3,6 @@
 # pywallet.py 1.1
 # based on http://github.com/gavinandresen/bitcointools
 #
-# Usage: pywallet.py [options]
-#
-# Options:
-#   --version            show program's version number and exit
-#   -h, --help           show this help message and exit
-#   --dumpwallet         dump wallet in json format
-#   --importprivkey=KEY  import private key from vanitygen
-#   --datadir=DATADIR    wallet directory (defaults to bitcoin default)
-#   --testnet            use testnet subdirectory and address type
 
 from bsddb.db import *
 import os, sys, time
@@ -782,7 +773,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 	del(json_db['pool'])
 	del(json_db['names'])
 
-def importprivkey(db, sec):
+def importprivkey(db, sec, label, reserve):
 	pkey = regenerate_key(sec)
 	if not pkey:
 		return False
@@ -796,7 +787,8 @@ def importprivkey(db, sec):
 	print "Privkey: %s" % SecretToASecret(secret)
 
 	update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
-	update_wallet(db, 'name', { 'hash' : addr, 'name' : '' })
+	if not reserve:
+		update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
 
 	return True
 
@@ -821,8 +813,15 @@ def main():
 		help="wallet filename (defaults to wallet.dat)",
 		default="wallet.dat")
 
+	parser.add_option("--label", dest="label", 
+		help="label shown in the adress book (defaults to '')",
+		default="")
+
 	parser.add_option("--testnet", dest="testnet", action="store_true",
 		help="use testnet subdirectory and address type")
+
+	parser.add_option("--reserve", dest="reserve", action="store_true",
+		help="import as a reserve key, i.e. it won't show in the adress book")
 
 	(options, args) = parser.parse_args()
 
@@ -854,7 +853,7 @@ def main():
 		else:	
 			db = open_wallet(db_env, options.walletfile, writable=True)
 
-			if importprivkey(db, options.key):
+			if importprivkey(db, options.key, options.label, options.reserve):
 				print "Imported successfully"
 			else:
 				print "Bad private key"
