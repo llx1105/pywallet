@@ -11,4 +11,6 @@ Options:
   --testnet            use testnet subdirectory and address type
   --reserve            import as a reserve key, i.e. it won't show in the
                        adress book
+  --balance=KEY_BALANCE
+                        prints balance of KEY_BALANCE
 

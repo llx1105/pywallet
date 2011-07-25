@@ -17,6 +17,7 @@ import string
 import exceptions
 import hashlib
 import random
+import urllib
 
 max_version = 32500
 addrtype = 0
@@ -792,6 +793,16 @@ def importprivkey(db, sec, label, reserve):
 
 	return True
 
+def balance(site, address):
+	page=urllib.urlopen("%s=%s" % (site, address))
+	json_acc = json.loads(page.read().split("<end>")[0])
+	if json_acc['0'] == 0:
+		return "Invalid address"
+	elif json_acc['0'] == 2:
+		return "Never used"
+	else:
+		return json_acc['balance']
+
 from optparse import OptionParser
 
 def main():
@@ -823,7 +834,14 @@ def main():
 	parser.add_option("--reserve", dest="reserve", action="store_true",
 		help="import as a reserve key, i.e. it won't show in the adress book")
 
+	parser.add_option("--balance", dest="key_balance",
+		help="prints balance of KEY_BALANCE")
+
 	(options, args) = parser.parse_args()
+
+	if options.key_balance is not None:
+		print(balance('http://bitcoin.site50.net/balance.php?adresse', options.key_balance))
+		exit(0)
 
 	if options.dump is None and options.key is None:
 		print "A mandatory option is missing\n"
