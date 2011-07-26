@@ -10,6 +10,9 @@ Options:
   --wallet=WALLETFILE   wallet filename (defaults to wallet.dat)
   --label=LABEL         label shown in the adress book (defaults to '')
   --testnet             use testnet subdirectory and address type
+  --namecoin            use namecoin address type
+  --info                display pubkey, privkey (both depending on the
+                        network) and hexkey
   --reserve             import as a reserve key, i.e. it won't show in the
                         adress book
   --balance=KEY_BALANCE

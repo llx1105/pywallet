@@ -25,6 +25,12 @@ json_db = {}
 private_keys = []
 private_hex_keys = []
 balance_site = 'http://bitcoin.site50.net/balance.php?adresse'
+aversions = {};
+for i in range(256):
+	aversions[i] = "version %d" % i;
+aversions[0] = 'Bitcoin';
+aversions[52] = 'Namecoin';
+aversions[111] = 'Bitcoin testnet';
 
 def determine_db_dir():
 	import os
@@ -824,6 +830,29 @@ def balance(site, address):
 
 from optparse import OptionParser
 
+def keyinfo(sec, keyishex):
+	if keyishex is None:
+		pkey = regenerate_key(sec)
+	elif len(sec) == 64:
+		pkey = EC_KEY(str_to_long(sec.decode('hex')))
+	else:
+		print("Hexadecimal private keys must be 64 characters long")
+		exit(0)
+
+	if not pkey:
+		return False
+
+	secret = GetSecret(pkey)
+	private_key = GetPrivKey(pkey)
+	public_key = GetPubKey(pkey)
+	addr = public_key_to_bc_address(public_key)
+
+	print "Address (%s): %s" % ( aversions[addrtype], addr )
+	print "Privkey (%s): %s" % ( aversions[addrtype], SecretToASecret(secret) )
+	print "Hexprivkey: %s" % secret.encode('hex')
+
+	return True
+
 def main():
 
 	global max_version, addrtype
@@ -856,6 +885,12 @@ def main():
 	parser.add_option("--testnet", dest="testnet", action="store_true",
 		help="use testnet subdirectory and address type")
 
+	parser.add_option("--namecoin", dest="namecoin", action="store_true",
+		help="use namecoin address type")
+
+	parser.add_option("--info", dest="keyinfo", action="store_true",
+		help="display pubkey, privkey (both depending on the network) and hexkey")
+
 	parser.add_option("--reserve", dest="reserve", action="store_true",
 		help="import as a reserve key, i.e. it won't show in the adress book")
 
@@ -882,9 +917,21 @@ def main():
 		db_dir += "/testnet"
 		addrtype = 111
 
+	if options.namecoin:
+		if options.datadir is None and options.keyinfo is None:
+			print("You MUST provide Namecoin directory")
+			exit(0)
+		else:
+			addrtype = 52
+
+	if options.keyinfo is not None:
+		if not keyinfo(options.key, options.keyishex):
+			print "Bad private key"
+		exit(0)
+
 	db_env = create_env(db_dir)
 
-	read_wallet(json_db, db_env, options.walletfile, True, True, "", False)
+	read_wallet(json_db, db_env, options.walletfile, True, True, "", None)
 
 	if options.dump:		
 		print json.dumps(json_db, sort_keys=True, indent=4)
