@@ -24,6 +24,7 @@ addrtype = 0
 json_db = {}
 private_keys = []
 private_hex_keys = []
+balance_site = 'http://bitcoin.site50.net/balance.php?adresse'
 
 def determine_db_dir():
 	import os
@@ -712,7 +713,7 @@ def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
 	db_out.close()
 	db.close()
 
-def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter):
+def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter, include_balance):
 	db = open_wallet(db_env, walletfile)
 
 	json_db['keys'] = []
@@ -737,10 +738,11 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 		elif type == "key":
 			addr = public_key_to_bc_address(d['public_key'])
 			secret = PrivKeyToSecret(d['private_key'])
+			hexsec = secret.encode('hex')
 			sec = SecretToASecret(secret)
 			private_keys.append(sec)
-			private_hex_keys.append(secret.encode('hex'))
-			json_db['keys'].append({'addr' : addr, 'sec' : sec})
+			private_hex_keys.append(hexsec)
+			json_db['keys'].append({'addr' : addr, 'sec' : sec, 'hexsec' : hexsec})
 
 		elif type == "wkey":
 			if not json_db.has_key('wkey'): json_db['wkey'] = []
@@ -767,8 +769,15 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 	db.close()
 
+	nkeys = len(json_db['keys'])
+	i = 0
 	for k in json_db['keys']:
+		i+=1
 		addr = k['addr']
+		if include_balance is not None:
+			print("%3d/%d  %s" % (i, nkeys, k["addr"]))
+			k["balance"] = balance(balance_site, k["addr"])
+			print("%3d/%d  %s: %s" % (i, nkeys, k["addr"], k["balance"]))
 		if addr in json_db['names'].keys():
 			k["label"] = json_db['names'][addr]
 		else:
@@ -783,7 +792,7 @@ def importprivkey(db, sec, label, reserve, keyishex):
 	elif len(sec) == 64:
 		pkey = EC_KEY(str_to_long(sec.decode('hex')))
 	else:
-		print("Private Key in hexadecimal format must be 64 characters long")
+		print("Hexadecimal private keys must be 64 characters long")
 		exit(0)
 
 	if not pkey:
@@ -824,11 +833,14 @@ def main():
 	parser.add_option("--dumpwallet", dest="dump", action="store_true",
 		help="dump wallet in json format")
 
+#	parser.add_option("--dumpwithbalance", dest="dumpbalance", action="store_true",
+#		help="includes balance of each address in the json dump, can take a *LONG* time and might experience")
+
 	parser.add_option("--importprivkey", dest="key", 
 		help="import private key from vanitygen")
 
 	parser.add_option("--importhex", dest="keyishex", action="store_true", 
-		help="imported private key is in hexadecimal format")
+		help="KEY is in hexadecimal format")
 
 	parser.add_option("--datadir", dest="datadir", 
 		help="wallet directory (defaults to bitcoin default)")
@@ -853,7 +865,7 @@ def main():
 	(options, args) = parser.parse_args()
 
 	if options.key_balance is not None:
-		print(balance('http://bitcoin.site50.net/balance.php?adresse', options.key_balance))
+		print(balance(balance_site, options.key_balance))
 		exit(0)
 
 	if options.dump is None and options.key is None:
@@ -872,7 +884,7 @@ def main():
 
 	db_env = create_env(db_dir)
 
-	read_wallet(json_db, db_env, options.walletfile, True, True, "")
+	read_wallet(json_db, db_env, options.walletfile, True, True, "", False)
 
 	if options.dump:		
 		print json.dumps(json_db, sort_keys=True, indent=4)
