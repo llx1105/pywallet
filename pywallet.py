@@ -23,6 +23,7 @@ max_version = 32500
 addrtype = 0
 json_db = {}
 private_keys = []
+private_hex_keys = []
 
 def determine_db_dir():
 	import os
@@ -735,8 +736,10 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 		elif type == "key":
 			addr = public_key_to_bc_address(d['public_key'])
-			sec = SecretToASecret(PrivKeyToSecret(d['private_key']))
+			secret = PrivKeyToSecret(d['private_key'])
+			sec = SecretToASecret(secret)
 			private_keys.append(sec)
+			private_hex_keys.append(secret.encode('hex'))
 			json_db['keys'].append({'addr' : addr, 'sec' : sec})
 
 		elif type == "wkey":
@@ -774,8 +777,15 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 	del(json_db['pool'])
 	del(json_db['names'])
 
-def importprivkey(db, sec, label, reserve):
-	pkey = regenerate_key(sec)
+def importprivkey(db, sec, label, reserve, keyishex):
+	if keyishex is None:
+		pkey = regenerate_key(sec)
+	elif len(sec) == 64:
+		pkey = EC_KEY(str_to_long(sec.decode('hex')))
+	else:
+		print("Private Key in hexadecimal format must be 64 characters long")
+		exit(0)
+
 	if not pkey:
 		return False
 
@@ -816,6 +826,9 @@ def main():
 
 	parser.add_option("--importprivkey", dest="key", 
 		help="import private key from vanitygen")
+
+	parser.add_option("--importhex", dest="keyishex", action="store_true", 
+		help="imported private key is in hexadecimal format")
 
 	parser.add_option("--datadir", dest="datadir", 
 		help="wallet directory (defaults to bitcoin default)")
@@ -866,12 +879,12 @@ def main():
 	elif options.key:
 		if json_db['version'] > max_version:
 			print "Version mismatch (must be <= %d)" % max_version
-		elif options.key in private_keys:
+		elif (options.keyishex is None and options.key in private_keys) or (options.keyishex is not None and options.key in private_hex_keys):
 			print "Already exists"
 		else:	
 			db = open_wallet(db_env, options.walletfile, writable=True)
 
-			if importprivkey(db, options.key, options.label, options.reserve):
+			if importprivkey(db, options.key, options.label, options.reserve, options.keyishex):
 				print "Imported successfully"
 			else:
 				print "Bad private key"
@@ -880,3 +893,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
+
