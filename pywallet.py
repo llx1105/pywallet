@@ -781,9 +781,9 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 		i+=1
 		addr = k['addr']
 		if include_balance is not None:
-			print("%3d/%d  %s" % (i, nkeys, k["addr"]))
+#			print("%3d/%d  %s" % (i, nkeys, k["addr"]))
 			k["balance"] = balance(balance_site, k["addr"])
-			print("%3d/%d  %s: %s" % (i, nkeys, k["addr"], k["balance"]))
+#			print("  %s" % (i, nkeys, k["addr"], k["balance"]))
 		if addr in json_db['names'].keys():
 			k["label"] = json_db['names'][addr]
 		else:
@@ -863,7 +863,7 @@ def main():
 		help="dump wallet in json format")
 
 #	parser.add_option("--dumpwithbalance", dest="dumpbalance", action="store_true",
-#		help="includes balance of each address in the json dump, can take a *LONG* time and might experience")
+#		help="includes balance of each address in the json dump, can take a *LONG* time and might experience timeouts or bans")
 
 	parser.add_option("--importprivkey", dest="key", 
 		help="import private key from vanitygen")
@@ -887,6 +887,9 @@ def main():
 
 	parser.add_option("--namecoin", dest="namecoin", action="store_true",
 		help="use namecoin address type")
+
+	parser.add_option("--othernetwork", dest="otherversion",
+		help="use other network address type, whose version is OTHERVERSION")
 
 	parser.add_option("--info", dest="keyinfo", action="store_true",
 		help="display pubkey, privkey (both depending on the network) and hexkey")
@@ -917,12 +920,15 @@ def main():
 		db_dir += "/testnet"
 		addrtype = 111
 
-	if options.namecoin:
+	if options.namecoin or options.otherversion is not None:
 		if options.datadir is None and options.keyinfo is None:
-			print("You MUST provide Namecoin directory")
+			print("You MUST provide your wallet directory")
 			exit(0)
 		else:
-			addrtype = 52
+			if options.namecoin:
+				addrtype = 52
+			else:
+				addrtype = int(options.otherversion)
 
 	if options.keyinfo is not None:
 		if not keyinfo(options.key, options.keyishex):
