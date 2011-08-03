@@ -866,8 +866,8 @@ class WIRoot(resource.Resource):
 			header = '<h1>Pywallet Web Interface</h1><h3>CLOSE BITCOIN BEFORE USING!</h3><br /><br />'
 
 			DWForm = '<h3>Dump your wallet:</h3><form style="margin-left:15px;" action="DumpWallet" method=get>\
-					Wallet Directory: <input type=text name="dir" id="dwf-dir" size=40 /><br />\
-					Wallet Filename: <input type=text name="name" id="dwf-name" /><br />\
+					Wallet Directory: <input type=text name="dir" id="dwf-dir" size=40 value="' + determine_db_dir() + '" /><br />\
+					Wallet Filename: <input type=text name="name" id="dwf-name" value="wallet.dat" /><br />\
 					<input type=submit value="Dump wallet" onClick="document.getElementById(\'DWDiv\').style.display=\'block\';document.getElementById(\'dwf-close\').style.display=\'inline\';ajaxDW();return false;" />\
 					<input type=button value="Close" onClick="document.getElementById(\'DWDiv\').style.display=\'none\';document.getElementById(\'dwf-close\').style.display=\'none\';" id="dwf-close" style="display:none;" />\
 					<div id="DWDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
@@ -885,8 +885,8 @@ class WIRoot(resource.Resource):
 				</form><br />'
 
 			ImportForm = '<h3>Import a key in your wallet:</h3><form style="margin-left:15px;" action="Import" method=get>\
-					Wallet Directory: <input type=text name="dir" id="impf-dir" size=40 /><br />\
-					Wallet Filename: <input type=text name="name" id="impf-name" /><br />\
+					Wallet Directory: <input type=text name="dir" id="impf-dir" size=40 value="' + determine_db_dir() + '" /><br />\
+					Wallet Filename: <input type=text name="name" id="impf-name" value="wallet.dat" /><br />\
 					Key: <input type=text name="key" id="impf-key" size=65 /><br />\
 					Label: <input type=text name="label" id="impf-label" /><br />\
 					<input type="checkbox" name="reserve" value="true" id="impf-reserve" onClick="document.getElementById(\'impf-label\').disabled=document.getElementById(\'impf-reserve\').checked" /> Reserve<br />\
