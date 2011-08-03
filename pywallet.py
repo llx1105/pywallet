@@ -897,7 +897,13 @@ class WIRoot(resource.Resource):
 					<input type=submit value="Import key" onClick="document.getElementById(\'ImportDiv\').style.display=\'block\';document.getElementById(\'impf-close\').style.display=\'inline\';ajaxImport();return false;" />\
 					<input type=button value="Close" onClick="document.getElementById(\'ImportDiv\').style.display=\'none\';document.getElementById(\'impf-close\').style.display=\'none\';" id="impf-close" style="display:none;" />\
 					<div id="ImportDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
-				</form>'
+				</form><br />'
+
+			BalanceForm = '<h3>Print the balance of a Bitcoin address:</h3><form style="margin-left:15px;" action="Balance" method=get>\
+					Key: <input type=text name="key" id="bf-key" size=35 /><br />\
+					<input type=submit value="Get balance" onClick="ajaxBalance();return false;" /><br /><br />\
+					<div id="BalanceDiv"></div>\
+				</form><br /><br /><br /><br />'
 
 			Misc = ''
 
@@ -980,9 +986,35 @@ class WIRoot(resource.Resource):
 					document.getElementById("ImportDiv").innerHTML = "Loading...";\
 					ajaxRequest.send(null);\
  				}\
+				function ajaxBalance(){\
+					var ajaxRequest;\
+					try{\
+						ajaxRequest = new XMLHttpRequest();\
+					} catch (e){\
+						try{\
+							ajaxRequest = new ActiveXObject("Msxml2.XMLHTTP");\
+						} catch (e) {\
+							try{\
+								ajaxRequest = new ActiveXObject("Microsoft.XMLHTTP");\
+							} catch (e){\
+								alert("Your browser broke!");\
+								return false;\
+							}\
+						}\
+					}\
+					ajaxRequest.onreadystatechange = function(){\
+						if(ajaxRequest.readyState == 4){\
+							document.getElementById("BalanceDiv").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;\
+						}\
+					};\
+					var queryString = "/Balance?key="+document.getElementById("bf-key").value;\
+					ajaxRequest.open("GET", queryString, true);\
+					document.getElementById("BalanceDiv").innerHTML = "Loading...";\
+					ajaxRequest.send(null);\
+ 				}\
 				</script>'
 
-			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + InfoForm + ImportForm + Misc + '</body></html>'
+			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + InfoForm + ImportForm + BalanceForm + Misc + '</body></html>'
 			return page
 
     def getChild(self, name, request):
@@ -1011,6 +1043,18 @@ class WIDumpWallet(resource.Resource):
         except:
             log.err()
             return 'Error in dump page'
+
+        def render_POST(self, request):
+            return self.render_GET(request)
+
+class WIBalance(resource.Resource):
+
+    def render_GET(self, request):
+        try:
+				return "%s"%str(balance(balance_site, request.args['key'][0]).encode('utf-8'))
+        except:
+            log.err()
+            return 'Error in balance page'
 
         def render_POST(self, request):
             return self.render_GET(request)
@@ -1165,7 +1209,8 @@ if __name__ == '__main__':
 	VIEWS = {
 		 'DumpWallet': WIDumpWallet(),
 		 'Import': WIImport(),
-		 'Info': WIInfo()
+		 'Info': WIInfo(),
+		 'Balance': WIBalance()
 	}
 
 	if options.web is not None:
