@@ -863,7 +863,7 @@ def keyinfo(sec, keyishex):
 class WIRoot(resource.Resource):
 
     def render_GET(self, request):
-			header = '<h1>Pywallet Web Interface</h1><br /><br />'
+			header = '<h1>Pywallet Web Interface</h1><h3>CLOSE BITCOIN BEFORE USING!</h3><br /><br />'
 
 			DWForm = '<h3>Dump your wallet:</h3><form style="margin-left:15px;" action="DumpWallet" method=get>\
 					Wallet Directory: <input type=text name="dir" id="dwf-dir" size=40 /><br />\
