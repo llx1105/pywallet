@@ -25,6 +25,7 @@ from twisted.web.static import File
 from twisted.python import log
 from datetime import datetime
 
+from subprocess import *
 
 max_version = 32500
 addrtype = 0
@@ -863,7 +864,7 @@ def keyinfo(sec, keyishex):
 class WIRoot(resource.Resource):
 
     def render_GET(self, request):
-			header = '<h1>Pywallet Web Interface</h1><h3>CLOSE BITCOIN BEFORE USING!</h3><br /><br />'
+			header = '<h1>Pywallet Web Interface</h1><h3>CLOSE BITCOIN BEFORE USE!</h3><br /><br />'
 
 			DWForm = '<h3>Dump your wallet:</h3><form style="margin-left:15px;" action="DumpWallet" method=get>\
 					Wallet Directory: <input type=text name="dir" id="dwf-dir" size=40 value="' + determine_db_dir() + '" /><br />\
@@ -1204,6 +1205,10 @@ if __name__ == '__main__':
 	parser.add_option("--port", dest="port",
 		help="port of web interface (defaults to 8989)")
 
+#	parser.add_option("--forcerun", dest="forcerun",
+#		action="store_true",
+#		help="run even if pywallet detects bitcoin is running")
+
 	(options, args) = parser.parse_args()
 
 	VIEWS = {
@@ -1212,6 +1217,15 @@ if __name__ == '__main__':
 		 'Info': WIInfo(),
 		 'Balance': WIBalance()
 	}
+
+#	a=Popen("ps xa | grep ' bitcoin'", shell=True, bufsize=-1, stdout=PIPE).stdout
+#	aread=a.read()
+#	nl = aread.count("\n")
+#	a.close()
+#	if nl > 2:
+#		print('Bitcoin seems to be running: \n"%s"'%(aread))
+#		if options.forcerun is None:
+#			exit(0)
 
 	if options.web is not None:
 		webport = 8989
