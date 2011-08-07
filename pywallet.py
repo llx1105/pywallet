@@ -571,7 +571,8 @@ def open_wallet(db_env, walletfile, writable=False):
 def inversetxid(txid):
 	if len(txid) is not 64:
 		print("Bad txid")
-		exit(0)
+		return "CORRUPTEDTXID:"+txid
+#		exit(0)
 	new_txid = ""
 	for i in range(32):
 		new_txid += txid[62-2*i];
@@ -625,7 +626,9 @@ def parse_wallet(db, item_callback):
 				for i in xrange(n_vout):
 					d['txOut'].append(parse_TxOut(vds))
 				d['lockTime'] = vds.read_uint32()
-				d['tx'] = vds.input[start:vds.read_cursor]
+				d['tx'] = vds.input[start:vds.read_cursor].encode('hex_codec')
+				d['txv'] = value.encode('hex_codec')
+				d['txk'] = key.encode('hex_codec')
 			elif type == "name":
 				d['hash'] = kds.read_string()
 				d['name'] = vds.read_string()
@@ -729,8 +732,9 @@ def update_wallet(db, type, data):
 
 	try:
 		if type == "tx":
-			raise NotImplementedError("Writing items of type 'tx'")
-			kds.write(d['tx_id'])
+#			raise NotImplementedError("Writing items of type 'tx'")
+			kds.write(d['txi'][6:].decode('hex_codec'))
+			vds.write(d['txv'].decode('hex_codec'))
 		elif type == "name":
 			kds.write_string(d['hash'])
 			vds.write_string(d['name'])
@@ -815,7 +819,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 	def item_callback(type, d):
 		if type == "tx":
-			json_db['tx'].append({"txid" : d['tx_id'], "txin" : d['txIn'], "txout" : d['txOut']})
+			json_db['tx'].append({"tx_id" : d['tx_id'], "txin" : d['txIn'], "txout" : d['txOut'], "tx_v" : d['txv'], "tx_k" : d['txk']})
 
 		elif type == "name":
 			json_db['names'][d['hash']] = d['name']
@@ -966,7 +970,7 @@ class WIRoot(resource.Resource):
 					<div id="InfoDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
 				</form><br />'
 
-			ImportForm = '<h3>Import a key in your wallet:</h3><form style="margin-left:15px;" action="Import" method=get>\
+			ImportForm = '<h3>Import a key into your wallet:</h3><form style="margin-left:15px;" action="Import" method=get>\
 					Wallet Directory: <input type=text name="dir" id="impf-dir" size=40 value="' + determine_db_dir() + '" /><br />\
 					Wallet Filename: <input type=text name="name" id="impf-name" value="wallet.dat" /><br />\
 					Key: <input type=text name="key" id="impf-key" size=65 /><br />\
@@ -991,6 +995,16 @@ class WIRoot(resource.Resource):
 					<input type=submit value="Delete" onClick="document.getElementById(\'DeleteDiv\').style.display=\'block\';document.getElementById(\'d-close\').style.display=\'inline\';ajaxDelete();return false;" />\
 					<input type=button value="Close" onClick="document.getElementById(\'DeleteDiv\').style.display=\'none\';document.getElementById(\'d-close\').style.display=\'none\';" id="d-close" style="display:none;" />\
 					<div id="DeleteDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
+				</form><br />'
+
+			ImportTxForm = '<h3>Import a transaction into your wallet:</h3><form style="margin-left:15px;" action="ImportTx" method=get>\
+					Wallet Directory: <input type=text name="dir" id="it-dir" size=40 value="' + determine_db_dir() + '" /><br />\
+					Wallet Filename: <input type=text name="name" id="it-name" value="wallet.dat" /><br />\
+					Txk: <input type=text name="txk" id="it-txk" size=65 /><br />\
+					Txv: <input type=text name="txv" id="it-txv" size=65 /><br />\
+					<input type=submit value="Import" onClick="document.getElementById(\'ImportTxDiv\').style.display=\'block\';document.getElementById(\'it-close\').style.display=\'inline\';ajaxImportTx();return false;" />\
+					<input type=button value="Close" onClick="document.getElementById(\'ImportTxDiv\').style.display=\'none\';document.getElementById(\'it-close\').style.display=\'none\';" id="it-close" style="display:none;" />\
+					<div id="ImportTxDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
 				</form><br />'
 
 			BalanceForm = '<h3>Print the balance of a Bitcoin address:</h3><form style="margin-left:15px;" action="Balance" method=get>\
@@ -1141,9 +1155,35 @@ class WIRoot(resource.Resource):
 					document.getElementById("DeleteDiv").innerHTML = "Loading...";\
 					ajaxRequest.send(null);\
  				}\
+				function ajaxImportTx(){\
+					var ajaxRequest;\
+					try{\
+						ajaxRequest = new XMLHttpRequest();\
+					} catch (e){\
+						try{\
+							ajaxRequest = new ActiveXObject("Msxml2.XMLHTTP");\
+						} catch (e) {\
+							try{\
+								ajaxRequest = new ActiveXObject("Microsoft.XMLHTTP");\
+							} catch (e){\
+								alert("Your browser broke!");\
+								return false;\
+							}\
+						}\
+					}\
+					ajaxRequest.onreadystatechange = function(){\
+						if(ajaxRequest.readyState == 4){\
+							document.getElementById("ImportTxDiv").innerHTML = ajaxRequest.responseText;\
+						}\
+					};\
+					var queryString = "/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value;\n\
+					ajaxRequest.open("GET", queryString, true);\n\
+					document.getElementById("ImportTxDiv").innerHTML = "Loading...";\
+					ajaxRequest.send(null);\
+ 				}\
 				</script>'
 
-			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + InfoForm + ImportForm + DeleteForm + BalanceForm + Misc + '</body></html>'
+			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + InfoForm + ImportForm + ImportTxForm + DeleteForm + BalanceForm + Misc + '</body></html>'
 			return page
 
     def getChild(self, name, request):
@@ -1245,6 +1285,39 @@ class WIInfo(resource.Resource):
         def render_POST(self, request):
             return self.render_GET(request)
 
+
+class WIImportTx(resource.Resource):
+
+    def render_GET(self, request):
+        global addrtype
+        try:
+				wdir=request.args['dir'][0]
+				wname=request.args['name'][0]
+				txk=request.args['txk'][0]
+				txv=request.args['txv'][0]
+				
+				if not os.path.isfile(wdir+"/"+wname):
+					return '%s/%s doesn\'t exist'%(wdir, wname)
+
+				db_env = create_env(wdir)
+				read_wallet(json_db, db_env, wname, True, True, "", None)
+				db = open_wallet(db_env, wname, writable=True)
+
+				d = {}
+				d['txi'] = txk
+				d['txv'] = txv
+				update_wallet(db, "tx", d)
+	
+				db.close()
+
+				return "<pre>txk: %s\nTransaction imported in %s/%s<pre>" % (txk, wdir, wname)
+
+        except:
+            log.err()
+            return 'Error in importtx page'
+
+        def render_POST(self, request):
+            return self.render_GET(request)
 
 class WIImport(resource.Resource):
 
@@ -1366,6 +1439,7 @@ if __name__ == '__main__':
 	VIEWS = {
 		 'DumpWallet': WIDumpWallet(),
 		 'Import': WIImport(),
+		 'ImportTx': WIImportTx(),
 		 'Info': WIInfo(),
 		 'Delete': WIDelete(),
 		 'Balance': WIBalance()
