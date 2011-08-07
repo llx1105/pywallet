@@ -688,7 +688,7 @@ def delete_from_wallet(db_env, walletfile, typedel, keydel):
 
 		if typedel == "tx":
 			if type == "tx":
-				if keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')):
+				if keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')) or keydel == "all":
 					db.delete(key)
 					deleted_items+=1
 		elif typedel == "key":
@@ -986,7 +986,7 @@ class WIRoot(resource.Resource):
 					Wallet Filename: <input type=text name="name" id="d-name" value="wallet.dat" /><br />\
 					Key: <input type=text name="key" id="d-key" size=65 /><br />\
 					Type:<br />\
-					<input type="radio" name="d-type" value="tx" CHECKED> Transaction<br>\
+					<input type="radio" name="d-type" value="tx" CHECKED> Transaction (type "all" in "Key" to delete them all)<br>\
 					<input type="radio" name="d-type" value="key"> Bitcoin address<br>\
 					<input type=submit value="Delete" onClick="document.getElementById(\'DeleteDiv\').style.display=\'block\';document.getElementById(\'d-close\').style.display=\'inline\';ajaxDelete();return false;" />\
 					<input type=button value="Close" onClick="document.getElementById(\'DeleteDiv\').style.display=\'none\';document.getElementById(\'d-close\').style.display=\'none\';" id="d-close" style="display:none;" />\
