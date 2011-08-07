@@ -40,6 +40,9 @@ aversions[0] = 'Bitcoin';
 aversions[52] = 'Namecoin';
 aversions[111] = 'Testnet';
 
+def iais(a):
+	return 's' if a>=2 else ''
+
 def determine_db_dir():
 	import os
 	import os.path
@@ -565,10 +568,37 @@ def open_wallet(db_env, walletfile, writable=False):
 	
 	return db
 
+def inversetxid(txid):
+	if len(txid) is not 64:
+		print("Bad txid")
+		exit(0)
+	new_txid = ""
+	for i in range(32):
+		new_txid += txid[62-2*i];
+		new_txid += txid[62-2*i+1];
+	return new_txid
+
 def parse_wallet(db, item_callback):
 	kds = BCDataStream()
 	vds = BCDataStream()
 
+
+	def parse_TxIn(vds):
+		d = {}
+		d['prevout_hash'] = vds.read_bytes(32).encode('hex')
+		d['prevout_n'] = vds.read_uint32()
+		d['scriptSig'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
+		d['sequence'] = vds.read_uint32()
+		return d
+
+
+	def parse_TxOut(vds):
+		d = {}
+		d['value'] = vds.read_int64()/1e8
+		d['scriptPubKey'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
+		return d
+
+	
 	for (key, value) in db.items():
 		d = { }
 
@@ -583,7 +613,19 @@ def parse_wallet(db, item_callback):
 
 		try:
 			if type == "tx":
-				d["tx_id"] = kds.read_bytes(32)
+				d["tx_id"] = inversetxid(kds.read_bytes(32).encode('hex_codec'))
+				start = vds.read_cursor
+				d['version'] = vds.read_int32()
+				n_vin = vds.read_compact_size()
+				d['txIn'] = []
+				for i in xrange(n_vin):
+					d['txIn'].append(parse_TxIn(vds))
+				n_vout = vds.read_compact_size()
+				d['txOut'] = []
+				for i in xrange(n_vout):
+					d['txOut'].append(parse_TxOut(vds))
+				d['lockTime'] = vds.read_uint32()
+				d['tx'] = vds.input[start:vds.read_cursor]
 			elif type == "name":
 				d['hash'] = kds.read_string()
 				d['name'] = vds.read_string()
@@ -633,6 +675,42 @@ def parse_wallet(db, item_callback):
 			print("value data in hex: %s"%value.encode('hex_codec'))
 			sys.exit(1)
 	
+def delete_from_wallet(db_env, walletfile, typedel, keydel):
+	db = open_wallet(db_env, walletfile, True)
+	kds = BCDataStream()
+	vds = BCDataStream()
+
+	deleted_items = 0
+	for (key, value) in db.items():
+		kds.clear(); kds.write(key)
+		vds.clear(); vds.write(value)
+		type = kds.read_string()
+
+		if typedel == "tx":
+			if type == "tx":
+				if keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')):
+					db.delete(key)
+					deleted_items+=1
+		elif typedel == "key":
+			if type == "key":
+				if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
+					db.delete(key)
+					deleted_items+=1
+			elif type == "pool":
+				vds.read_int32()
+				vds.read_int64()
+				if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
+					db.delete(key)
+					deleted_items+=1
+			elif type == "name":
+				if keydel == kds.read_string():
+					db.delete(key)
+					deleted_items+=1
+				
+
+	db.close()
+	return deleted_items
+
 def update_wallet(db, type, data):
 	"""Write a single item to the wallet.
 	db must be open with writable=True.
@@ -732,11 +810,14 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 	json_db['keys'] = []
 	json_db['pool'] = []
+	json_db['tx'] = []
 	json_db['names'] = {}
 
 	def item_callback(type, d):
+		if type == "tx":
+			json_db['tx'].append({"txid" : d['tx_id'], "txin" : d['txIn'], "txout" : d['txOut']})
 
-		if type == "name":
+		elif type == "name":
 			json_db['names'][d['hash']] = d['name']
 
 		elif type == "version":
@@ -797,8 +878,8 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 		else:
 			k["reserve"] = 1
 	
-	del(json_db['pool'])
-	del(json_db['names'])
+#	del(json_db['pool'])
+#	del(json_db['names'])
 
 def importprivkey(db, sec, label, reserve, keyishex):
 	if keyishex is None:
@@ -871,7 +952,7 @@ class WIRoot(resource.Resource):
 					Wallet Filename: <input type=text name="name" id="dwf-name" value="wallet.dat" /><br />\
 					<input type=submit value="Dump wallet" onClick="document.getElementById(\'DWDiv\').style.display=\'block\';document.getElementById(\'dwf-close\').style.display=\'inline\';ajaxDW();return false;" />\
 					<input type=button value="Close" onClick="document.getElementById(\'DWDiv\').style.display=\'none\';document.getElementById(\'dwf-close\').style.display=\'none\';" id="dwf-close" style="display:none;" />\
-					<div id="DWDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
+					<div id="DWDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:600px;background-color:#fff8dd;"></div>\
 				</form><br />'
 
 			InfoForm = '<h3>Get some info about one key:</h3><form style="margin-left:15px;" action="Info" method=get>\
@@ -900,6 +981,18 @@ class WIRoot(resource.Resource):
 					<div id="ImportDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
 				</form><br />'
 
+			DeleteForm = '<h3>Delete a key from your wallet:</h3><form style="margin-left:15px;" action="Delete" method=get>\
+					Wallet Directory: <input type=text name="dir" id="d-dir" size=40 value="' + determine_db_dir() + '" /><br />\
+					Wallet Filename: <input type=text name="name" id="d-name" value="wallet.dat" /><br />\
+					Key: <input type=text name="key" id="d-key" size=65 /><br />\
+					Type:<br />\
+					<input type="radio" name="d-type" value="tx" CHECKED> Transaction<br>\
+					<input type="radio" name="d-type" value="key"> Bitcoin address<br>\
+					<input type=submit value="Delete" onClick="document.getElementById(\'DeleteDiv\').style.display=\'block\';document.getElementById(\'d-close\').style.display=\'inline\';ajaxDelete();return false;" />\
+					<input type=button value="Close" onClick="document.getElementById(\'DeleteDiv\').style.display=\'none\';document.getElementById(\'d-close\').style.display=\'none\';" id="d-close" style="display:none;" />\
+					<div id="DeleteDiv" style="display:none;margin:10px 3% 10px;padding:10px;overflow:auto;width:50%;max-height:300px;background-color:#fff8dd;"></div>\
+				</form><br />'
+
 			BalanceForm = '<h3>Print the balance of a Bitcoin address:</h3><form style="margin-left:15px;" action="Balance" method=get>\
 					Key: <input type=text name="key" id="bf-key" size=35 /><br />\
 					<input type=submit value="Get balance" onClick="ajaxBalance();return false;" /><br /><br />\
@@ -909,6 +1002,15 @@ class WIRoot(resource.Resource):
 			Misc = ''
 
 			Javascript = '<script language="javascript" type="text/javascript">\
+				function get_radio_value(radioform){\
+					var rad_val;\
+					for (var i=0; i < radioform.length; i++){\
+						if (radioform[i].checked){\
+							rad_val = radioform[i].value;\
+						}\
+					}\
+					return rad_val;\
+				}\
 				function ajaxDW(){\
 					var ajaxRequest;\
 					try{\
@@ -1013,9 +1115,35 @@ class WIRoot(resource.Resource):
 					document.getElementById("BalanceDiv").innerHTML = "Loading...";\
 					ajaxRequest.send(null);\
  				}\
+				function ajaxDelete(){\
+					var ajaxRequest;\
+					try{\
+						ajaxRequest = new XMLHttpRequest();\
+					} catch (e){\
+						try{\
+							ajaxRequest = new ActiveXObject("Msxml2.XMLHTTP");\
+						} catch (e) {\
+							try{\
+								ajaxRequest = new ActiveXObject("Microsoft.XMLHTTP");\
+							} catch (e){\
+								alert("Your browser broke!");\
+								return false;\
+							}\
+						}\
+					}\
+					ajaxRequest.onreadystatechange = function(){\
+						if(ajaxRequest.readyState == 4){\
+							document.getElementById("DeleteDiv").innerHTML = ajaxRequest.responseText;\
+						}\
+					};\
+					var queryString = "/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"));\n\
+					ajaxRequest.open("GET", queryString, true);\n\
+					document.getElementById("DeleteDiv").innerHTML = "Loading...";\
+					ajaxRequest.send(null);\
+ 				}\
 				</script>'
 
-			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + InfoForm + ImportForm + BalanceForm + Misc + '</body></html>'
+			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + InfoForm + ImportForm + DeleteForm + BalanceForm + Misc + '</body></html>'
 			return page
 
     def getChild(self, name, request):
@@ -1056,6 +1184,30 @@ class WIBalance(resource.Resource):
         except:
             log.err()
             return 'Error in balance page'
+
+        def render_POST(self, request):
+            return self.render_GET(request)
+
+class WIDelete(resource.Resource):
+
+    def render_GET(self, request):
+        try:
+				wdir=request.args['dir'][0]
+				wname=request.args['name'][0]
+				keydel=request.args['keydel'][0]
+				typedel=request.args['typedel'][0]
+				db_env = create_env(wdir)
+
+				if not os.path.isfile(wdir+"/"+wname):
+					return '%s/%s doesn\'t exist'%(wdir, wname)
+
+				deleted_items = delete_from_wallet(db_env, wname, typedel, keydel)
+
+				return "%s:%s has been successfully deleted from %s/%s, resulting in %d deleted item%s"%(typedel, keydel, wdir, wname, deleted_items, iais(deleted_items))
+
+        except:
+            log.err()
+            return 'Error in delete page'
 
         def render_POST(self, request):
             return self.render_GET(request)
@@ -1215,6 +1367,7 @@ if __name__ == '__main__':
 		 'DumpWallet': WIDumpWallet(),
 		 'Import': WIImport(),
 		 'Info': WIInfo(),
+		 'Delete': WIDelete(),
 		 'Balance': WIBalance()
 	}
 
