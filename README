@@ -25,3 +25,35 @@ Options:
   --web                 run pywallet web interface
   --port=PORT           port of web interface (defaults to 8989)
 
+
+
+
+
+
+
+Install dependencies:
+
+Debian-based Linux:
+ aptitude install build-esential python-dev python-twisted python-bsddb3
+
+OSX, proposed by defxor:
+ 1. Install Macports from http://www.macports.org/
+ 2. sudo port install python27 python_select
+ 3. sudo python_select python27
+ 4. sudo port select --set python python27
+ 5. sudo port install py-bsddb
+ 6. sudo port install py27-twisted
+
+Windows: 
+ 1. Install Python 2.7
+ 2. Install Twisted 11.0.0 for Py2.7, then Zope.Interface (a .egg file) for Py2.7: http://twistedmatrix.com/trac/wiki/Downloads
+
+ 3. Untested, proposed by TeaRex: install Zope.Interface from http://www.lfd.uci.edu/~gohlke/pythonlibs
+
+ If this doesn't work, you will have to install the egg file:
+
+ 3(32bit). http://pypi.python.org/pypi/setuptools#downloads to install setuptools
+ 3(64bit). http://pypi.python.org/pypi/setuptools#windows to download, then run ez_setup.py
+
+ 4. Go to C:\Python27\Scripts
+ 5. Run easy_install.exe zope.interface-3.6.4-py2.7-win-amd64.egg
