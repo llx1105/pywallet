@@ -4,7 +4,13 @@
 # based on http://github.com/gavinandresen/bitcointools
 #
 
-from bsddb.db import *
+missing_dep = []
+
+try:
+	from bsddb.db import *
+except:
+	missing_dep.append('bsddb')
+
 import os, sys, time
 import json
 import logging
@@ -19,13 +25,23 @@ import hashlib
 import random
 import urllib
 
-from twisted.internet import reactor
-from twisted.web import server, resource
-from twisted.web.static import File
-from twisted.python import log
-from datetime import datetime
+try:
+	from twisted.internet import reactor
+	from twisted.web import server, resource
+	from twisted.web.static import File
+	from twisted.python import log
+except:
+	missing_dep.append('twisted')
 
+from datetime import datetime
 from subprocess import *
+
+
+try:
+	import ecdsa
+	from ecdsa import der
+except:
+	missing_dep.append('ecdsa')
 
 max_version = 32500
 addrtype = 0
@@ -61,6 +77,12 @@ _b = 0x0000000000000000000000000000000000000000000000000000000000000007L
 _a = 0x0000000000000000000000000000000000000000000000000000000000000000L
 _Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
 _Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
+
+curve_secp256k1 = ecdsa.ellipticcurve.CurveFp (_p, _a, _b)
+generator_secp256k1 = g = ecdsa.ellipticcurve.Point (curve_secp256k1, _Gx, _Gy, _r)
+randrange = random.SystemRandom().randrange
+secp256k1 = ecdsa.curves.Curve ( "secp256k1", curve_secp256k1, generator_secp256k1, (1, 3, 132, 0, 10) )
+ecdsa.curves.curves.append (secp256k1)
 
 class CurveFp( object ):
 	def __init__( self, p, a, b ):
@@ -446,6 +468,77 @@ def parse_setting(setting, vds):
 
 class SerializationError(Exception):
 	""" Thrown when there's a problem deserializing or serializing """
+
+class KEY:
+
+	 def __init__ (self):
+		  self.prikey = None
+		  self.pubkey = None
+
+	 def generate (self, secret=None):
+		  if secret:
+				exp = int ('0x' + secret.encode ('hex'), 16)
+				self.prikey = ecdsa.SigningKey.from_secret_exponent (exp, curve=secp256k1)
+		  else:
+				self.prikey = ecdsa.SigningKey.generate (curve=secp256k1)
+		  self.pubkey = self.prikey.get_verifying_key()
+		  return self.prikey.to_der()
+
+	 def set_privkey (self, key):
+		  if len(key) == 279:
+				seq1, rest = der.remove_sequence (key)
+				integer, rest = der.remove_integer (seq1)
+				octet_str, rest = der.remove_octet_string (rest)
+				tag1, cons1, rest, = der.remove_constructed (rest)
+				tag2, cons2, rest, = der.remove_constructed (rest)
+				point_str, rest = der.remove_bitstring (cons2)
+				self.prikey = ecdsa.SigningKey.from_string(octet_str, curve=secp256k1)
+		  else:
+				self.prikey = ecdsa.SigningKey.from_der (key)
+
+	 def set_pubkey (self, key):
+		  key = key[1:]
+		  self.pubkey = ecdsa.VerifyingKey.from_string (key, curve=secp256k1)
+
+	 def get_privkey (self):
+		  _p = self.prikey.curve.curve.p ()
+		  _r = self.prikey.curve.generator.order ()
+		  _Gx = self.prikey.curve.generator.x ()
+		  _Gy = self.prikey.curve.generator.y ()
+		  encoded_oid2 = der.encode_oid (*(1, 2, 840, 10045, 1, 1))
+		  encoded_gxgy = "\x04" + ("%64x" % _Gx).decode('hex') + ("%64x" % _Gy).decode('hex')
+		  param_sequence = der.encode_sequence (
+				ecdsa.der.encode_integer(1),
+				    der.encode_sequence (
+				    encoded_oid2,
+				    der.encode_integer (_p),
+				),
+				der.encode_sequence (
+				    der.encode_octet_string("\x00"),
+				    der.encode_octet_string("\x07"),
+				),
+				der.encode_octet_string (encoded_gxgy),
+				der.encode_integer (_r),
+				der.encode_integer (1),
+		  );
+		  encoded_vk = "\x00\x04" + self.pubkey.to_string ()
+		  return der.encode_sequence (
+				der.encode_integer (1),
+				der.encode_octet_string (self.prikey.to_string ()),
+				der.encode_constructed (0, param_sequence),
+				der.encode_constructed (1, der.encode_bitstring (encoded_vk)),
+		  )
+
+	 def get_pubkey (self):
+		  return "\x04" + self.pubkey.to_string()
+
+	 def sign (self, hash):
+		  sig = self.prikey.sign_digest (hash, sigencode=ecdsa.util.sigencode_der)
+		  return sig.encode('hex')
+
+	 def verify (self, hash, sig):
+		  return self.pubkey.verify_digest (sig, hash, sigdecode=ecdsa.util.sigdecode_der)
+
 
 class BCDataStream(object):
 	def __init__(self):
@@ -973,7 +1066,7 @@ def WI_FormEnd():
 	return '</form><br />'
 
 def WI_RadioButton(name, value, id, checked, label):
-	return '<input type="radio" name="%s" value="%s" id="%s" %s >%s<br>'%(name, value, id, checked, label)
+	return '&nbsp;&nbsp;&nbsp;<input type="radio" name="%s" value="%s" id="%s" %s >%s<br>'%(name, value, id, checked, label)
 
 def WI_Checkbox(name, value, id, other, label):
 	return '<input type="checkbox" name="%s" value="%s" id="%s" %s />%s<br />'%(name, value, id, other, label)
@@ -1032,12 +1125,19 @@ class WIRoot(resource.Resource):
 						WI_ReturnDiv('DTxDiv') + \
 						WI_FormEnd()
 
-			InfoForm = WI_FormInit('Get some info about one key:', 'Info') + \
+			InfoForm = WI_FormInit('Get some info about one key'+(' and sign/verify messages' if 'ecdsa' not in missing_dep else '')+':', 'Info') + \
 						WI_InputText('Key: ', 'key', 'if-key', '', 60) + \
+						(WI_InputText('Message: ', 'msg', 'if-msg', '', 30) if 'ecdsa' not in missing_dep else '') + \
+						(WI_InputText('Signature: ', 'sig', 'if-sig', '', 30) if 'ecdsa' not in missing_dep else '') + \
+						(WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30) if 'ecdsa' not in missing_dep else '') + \
 						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'if-vers', '0', 1) + \
 						"Format:<br />" + \
 						WI_RadioButton('format', 'reg', 'if-reg', 'CHECKED', ' Regular, base 58') + \
 						WI_RadioButton('format', 'hex', 'if-hex', '', ' Hexadecimal, 64 characters long') + \
+						"You want:<br />" + \
+						WI_RadioButton('i-need', '1', 'if-n-info', '', ' Info') + \
+						WI_RadioButton('i-need', '2', 'if-n-sv', '', ' Sign and verify') + \
+						WI_RadioButton('i-need', '3', 'if-n-both', 'CHECKED', ' Both') + \
 						WI_Submit('Get info', 'InfoDiv', 'if-close', 'ajaxInfo') + \
 						WI_CloseButton('InfoDiv', 'if-close') + \
 						WI_ReturnDiv('InfoDiv') + \
@@ -1101,7 +1201,7 @@ class WIRoot(resource.Resource):
 				}' + \
 			WI_AjaxFunction('DW', 'document.getElementById("DWDiv").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value', 'document.getElementById("DWDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('DTx', 'document.getElementById("DTxDiv").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("DTxDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
+			WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('Balance', 'document.getElementById("BalanceDiv").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("BalanceDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('Delete', 'document.getElementById("DeleteDiv").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("DeleteDiv").innerHTML = "Loading...";') + \
@@ -1202,6 +1302,27 @@ class WIDelete(resource.Resource):
         def render_POST(self, request):
             return self.render_GET(request)
 
+def message_to_hash(pubkey, msg):
+	str = ""
+#	str += '04%064x%064x'%(pubkey.point.x(), pubkey.point.y())
+#	str += "Padding text - "
+	str += msg
+	print(str)
+	hash = long(Hash(str).encode('hex'), 16)
+	print(hash)
+	return hash
+
+def sign_message(secret, msg):
+	k = KEY()
+	k.generate(secret)
+	return k.sign(Hash('coucou'))
+
+def verify_message_signature(pubkey, sign, msg):
+	k = KEY()
+	k.set_pubkey(pubkey.decode('hex'))
+	return k.verify(Hash(msg), sign.decode('hex'))
+
+
 class WIInfo(resource.Resource):
 
     def render_GET(self, request):
@@ -1210,23 +1331,54 @@ class WIInfo(resource.Resource):
 				sec = request.args['key'][0]
 				format = request.args['format'][0]
 				addrtype = int(request.args['vers'][0])
+				msg = request.args['msg'][0]
+				sig = request.args['sig'][0]
+				pubkey = request.args['pubkey'][0]
+				need = int(request.args['need'][0])
 				
-				if format in 'reg':
-					pkey = regenerate_key(sec)
-				elif len(sec) == 64:
-					pkey = EC_KEY(str_to_long(sec.decode('hex')))
-				else:
-					return "Hexadecimal private keys must be 64 characters long"
+				ret = ""
 
-				if not pkey:
-					return "Bad private key"
+				if sec is not '':
+					if format in 'reg':
+						pkey = regenerate_key(sec)
+					elif len(sec) == 64:
+						pkey = EC_KEY(str_to_long(sec.decode('hex')))
+					else:
+						return "Hexadecimal private keys must be 64 characters long"
 
-				secret = GetSecret(pkey)
-				private_key = GetPrivKey(pkey)
-				public_key = GetPubKey(pkey)
-				addr = public_key_to_bc_address(public_key)
+					if not pkey:
+						return "Bad private key"
 
-				return "Address (%s): %s<br />Privkey (%s): %s<br />Hexprivkey: %s" % ( aversions[addrtype], addr, aversions[addrtype], SecretToASecret(secret), secret.encode('hex') )
+					secret = GetSecret(pkey)
+					private_key = GetPrivKey(pkey)
+					public_key = GetPubKey(pkey)
+					addr = public_key_to_bc_address(public_key)
+
+					if need & 1:
+						ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
+						ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret))
+						ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
+#						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
+						ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
+						ret += '<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r) if (int(secret.encode('hex'), 16)>_r) else ''
+
+				if 'ecdsa' not in missing_dep and need & 2:
+					if sec is not '' and msg is not '':
+						if need & 1:
+							ret += "<br />"
+						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />"%(msg, addr, sign_message(secret, msg))
+
+					if sig is not '' and msg is not '' and pubkey is not '':
+						addr = public_key_to_bc_address(pubkey.decode('hex'))
+						try:
+							verify_message_signature(pubkey, sig, msg)
+							ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(msg, addr, sig)
+						except:
+							ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(msg, addr, sig)
+
+
+
+				return ret
 
         except:
             log.err()
@@ -1418,7 +1570,19 @@ if __name__ == '__main__':
 #		if options.forcerun is None:
 #			exit(0)
 
-	if options.web is not None:
+
+	if 'bsddb' in missing_dep:
+		print("pywallet needs 'bsddb' package to run, please install it")
+		exit(0)
+
+	if 'twisted' in missing_dep and options.web is not None:
+		print("'twisted' package is not installed, pywallet web interface can't be launched")
+
+	if 'ecdsa' in missing_dep:
+		print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
+
+
+	if 'twisted' not in missing_dep and options.web is not None:
 		webport = 8989
 		if options.port is not None:
 			webport = int(options.port)
@@ -1452,7 +1616,7 @@ if __name__ == '__main__':
 
 	if options.namecoin or options.otherversion is not None:
 		if options.datadir is None and options.keyinfo is None:
-			print("You MUST provide your wallet directory")
+			print("You must provide your wallet directory")
 			exit(0)
 		else:
 			if options.namecoin:
