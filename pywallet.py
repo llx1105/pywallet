@@ -1366,7 +1366,7 @@ class WIInfo(resource.Resource):
 					if sec is not '' and msg is not '':
 						if need & 1:
 							ret += "<br />"
-						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />"%(msg, addr, sign_message(secret, msg))
+						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(msg, addr, sign_message(secret, msg), pkey.pubkey.point.x(), pkey.pubkey.point.y())
 
 					if sig is not '' and msg is not '' and pubkey is not '':
 						addr = public_key_to_bc_address(pubkey.decode('hex'))
