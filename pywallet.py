@@ -37,12 +37,6 @@ from datetime import datetime
 from subprocess import *
 
 
-try:
-	import ecdsa
-	from ecdsa import der
-except:
-	missing_dep.append('ecdsa')
-
 max_version = 32500
 addrtype = 0
 json_db = {}
@@ -78,11 +72,16 @@ _a = 0x0000000000000000000000000000000000000000000000000000000000000000L
 _Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
 _Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
 
-curve_secp256k1 = ecdsa.ellipticcurve.CurveFp (_p, _a, _b)
-generator_secp256k1 = g = ecdsa.ellipticcurve.Point (curve_secp256k1, _Gx, _Gy, _r)
-randrange = random.SystemRandom().randrange
-secp256k1 = ecdsa.curves.Curve ( "secp256k1", curve_secp256k1, generator_secp256k1, (1, 3, 132, 0, 10) )
-ecdsa.curves.curves.append (secp256k1)
+try:
+	import ecdsa
+	from ecdsa import der
+	curve_secp256k1 = ecdsa.ellipticcurve.CurveFp (_p, _a, _b)
+	generator_secp256k1 = g = ecdsa.ellipticcurve.Point (curve_secp256k1, _Gx, _Gy, _r)
+	randrange = random.SystemRandom().randrange
+	secp256k1 = ecdsa.curves.Curve ( "secp256k1", curve_secp256k1, generator_secp256k1, (1, 3, 132, 0, 10) )
+	ecdsa.curves.curves.append (secp256k1)
+except:
+	missing_dep.append('ecdsa')
 
 class CurveFp( object ):
 	def __init__( self, p, a, b ):
@@ -1649,4 +1648,5 @@ if __name__ == '__main__':
 				print "Bad private key"
 
 			db.close()
+
 
