@@ -1314,7 +1314,7 @@ def message_to_hash(pubkey, msg):
 def sign_message(secret, msg):
 	k = KEY()
 	k.generate(secret)
-	return k.sign(Hash('coucou'))
+	return k.sign(Hash(msg))
 
 def verify_message_signature(pubkey, sign, msg):
 	k = KEY()
@@ -1648,5 +1648,6 @@ if __name__ == '__main__':
 				print "Bad private key"
 
 			db.close()
+
 
 
