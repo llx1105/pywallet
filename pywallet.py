@@ -901,7 +901,12 @@ def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
 	db_out.close()
 	db.close()
 
-def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter, include_balance):
+def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter, include_balance, vers=-1):
+	if vers > -1:
+		global addrtype
+		oldaddrtype = addrtype
+		addrtype = vers
+
 	db = open_wallet(db_env, walletfile)
 
 	json_db['keys'] = []
@@ -975,6 +980,9 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 	
 #	del(json_db['pool'])
 #	del(json_db['names'])
+	if vers > -1:
+		addrtype = oldaddrtype
+
 
 def importprivkey(db, sec, label, reserve, keyishex):
 	if keyishex is None:
@@ -1110,6 +1118,7 @@ class WIRoot(resource.Resource):
 			DWForm = WI_FormInit('Dump your wallet:', 'DumpWallet') + \
 						WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
 						WI_InputText('Wallet Filename: ', 'name', 'dwf-name', 'wallet.dat', 20) + \
+						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
 						WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
 						WI_CloseButton('DWDiv', 'dwf-close') + \
 						WI_ReturnDiv('DWDiv') + \
@@ -1198,7 +1207,7 @@ class WIRoot(resource.Resource):
 					}\
 					return rad_val;\
 				}' + \
-			WI_AjaxFunction('DW', 'document.getElementById("DWDiv").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value', 'document.getElementById("DWDiv").innerHTML = "Loading...";') + \
+			WI_AjaxFunction('DW', 'document.getElementById("DWDiv").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("DWDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('DTx', 'document.getElementById("DTxDiv").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("DTxDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
 			WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
@@ -1225,13 +1234,14 @@ class WIDumpWallet(resource.Resource):
         try:
 				wdir=request.args['dir'][0]
 				wname=request.args['name'][0]
+				version = int(request.args['version'][0])
 				log.msg('Wallet Dir: %s' %(wdir))
 				log.msg('Wallet Name: %s' %(wname))
 
 				if not os.path.isfile(wdir+"/"+wname):
 					return '%s/%s doesn\'t exist'%(wdir, wname)
 
-				read_wallet(json_db, create_env(wdir), wname, True, True, "", None)
+				read_wallet(json_db, create_env(wdir), wname, True, True, "", None, version)
 				return 'Wallet: %s/%s<br />Dump:<pre>%s</pre>'%(wdir, wname, json.dumps(json_db, sort_keys=True, indent=4))
         except:
             log.err()
@@ -1301,25 +1311,100 @@ class WIDelete(resource.Resource):
         def render_POST(self, request):
             return self.render_GET(request)
 
-def message_to_hash(pubkey, msg):
+def message_to_hash(msg, msgIsHex=False):
 	str = ""
 #	str += '04%064x%064x'%(pubkey.point.x(), pubkey.point.y())
 #	str += "Padding text - "
 	str += msg
-	print(str)
-	hash = long(Hash(str).encode('hex'), 16)
-	print(hash)
+	if msgIsHex:
+		str = str.decode('hex')
+	hash = Hash(str)
 	return hash
 
-def sign_message(secret, msg):
+def sign_message(secret, msg, msgIsHex=False):
 	k = KEY()
 	k.generate(secret)
-	return k.sign(Hash(msg))
+	return k.sign(message_to_hash(msg, msgIsHex))
 
-def verify_message_signature(pubkey, sign, msg):
+def verify_message_signature(pubkey, sign, msg, msgIsHex=False):
 	k = KEY()
 	k.set_pubkey(pubkey.decode('hex'))
-	return k.verify(Hash(msg), sign.decode('hex'))
+	return k.verify(message_to_hash(msg, msgIsHex), sign.decode('hex'))
+
+
+OP_DUP = 118;
+OP_HASH160 = 169;
+OP_EQUALVERIFY = 136;
+OP_CHECKSIG = 172;
+
+XOP_DUP = "%02x"%OP_DUP;
+XOP_HASH160 = "%02x"%OP_HASH160;
+XOP_EQUALVERIFY = "%02x"%OP_EQUALVERIFY;
+XOP_CHECKSIG = "%02x"%OP_CHECKSIG;
+
+BTC = 1e8
+
+def ct(l_prevh, l_prevn, l_prevsig, l_prevpubkey, l_value_out, l_pubkey_out, is_msg_to_sign=-1, oldScriptPubkey=""):
+	scriptSig = True
+	if is_msg_to_sign is not -1:
+		scriptSig = False
+		index = is_msg_to_sign
+
+	ret = ""
+	ret += inverse_str("%08x"%1)
+	nvin = len(l_prevh)
+	ret += "%02x"%nvin
+
+	for i in range(nvin):
+		txin_ret = ""
+		txin_ret2 = ""
+
+		txin_ret += inverse_str(l_prevh[i])
+		txin_ret += inverse_str("%08x"%l_prevn[i])
+
+		if scriptSig:
+			txin_ret2 += "%02x"%(len(l_prevsig[i])/2)
+			txin_ret2 += l_prevsig[i]
+			txin_ret2 += "%02x"%(len(l_prevpubkey[i])/2)
+			txin_ret2 += l_prevpubkey[i]
+
+			txin_ret += "%02x"%(len(txin_ret2)/2)
+			txin_ret += txin_ret2
+
+		elif index == i:
+			txin_ret += "%02x"%(len(oldScriptPubkey)/2)
+			txin_ret += oldScriptPubkey
+			
+		ret += txin_ret
+		ret += "ffffffff"
+
+
+	nvout = len(l_value_out)
+	ret += "%02x"%nvout
+	for i in range(nvout):
+		txout_ret = ""
+
+		txout_ret += inverse_str("%016x"%(l_value_out[i]))
+		txout_ret += "%02x"%(len(l_pubkey_out[i])/2+5)
+		txout_ret += "%02x"%OP_DUP
+		txout_ret += "%02x"%OP_HASH160
+		txout_ret += "%02x"%(len(l_pubkey_out[i])/2)
+		txout_ret += l_pubkey_out[i]
+		txout_ret += "%02x"%OP_EQUALVERIFY
+		txout_ret += "%02x"%OP_CHECKSIG
+		ret += txout_ret
+
+	ret += "00000000"
+	if not scriptSig:
+		ret += "01000000"
+	return ret
+
+def inverse_str(string):
+	ret = ""
+	for i in range(len(string)/2):
+		ret += string[len(string)-2-2*i];
+		ret += string[len(string)-2-2*i+1];
+	return ret
 
 
 class WIInfo(resource.Resource):
@@ -1330,10 +1415,27 @@ class WIInfo(resource.Resource):
 				sec = request.args['key'][0]
 				format = request.args['format'][0]
 				addrtype = int(request.args['vers'][0])
-				msg = request.args['msg'][0]
-				sig = request.args['sig'][0]
-				pubkey = request.args['pubkey'][0]
-				need = int(request.args['need'][0])
+				msgIsHex = False
+				msgIsFile = False
+				try:
+					msg = request.args['msg'][0]
+					if msg[0:4] == "Hex:":
+						msg = msg[4:]
+						msgIsHex = True
+					elif msg[0:5] == "File:":
+						msg = msg[5:]
+						if not os.path.isfile(msg):
+							return '%s doesn\'t exist'%(msg)
+						filin = open(msg, 'r')
+						msg = filin.read()
+						filin.close()
+						msgIsFile = True
+
+					sig = request.args['sig'][0]
+					pubkey = request.args['pubkey'][0]
+					need = int(request.args['need'][0])
+				except:
+					need = 1
 				
 				ret = ""
 
@@ -1357,6 +1459,7 @@ class WIInfo(resource.Resource):
 						ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
 						ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret))
 						ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
+						ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
 #						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
 						ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
 						ret += '<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r) if (int(secret.encode('hex'), 16)>_r) else ''
@@ -1365,17 +1468,15 @@ class WIInfo(resource.Resource):
 					if sec is not '' and msg is not '':
 						if need & 1:
 							ret += "<br />"
-						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(msg, addr, sign_message(secret, msg), pkey.pubkey.point.x(), pkey.pubkey.point.y())
+						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(msg if not msgIsFile else request.args['msg'][0], addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
 
 					if sig is not '' and msg is not '' and pubkey is not '':
 						addr = public_key_to_bc_address(pubkey.decode('hex'))
 						try:
-							verify_message_signature(pubkey, sig, msg)
-							ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(msg, addr, sig)
+							verify_message_signature(pubkey, sig, msg, msgIsHex)
+							ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(msg if not msgIsFile else request.args['msg'][0], addr, sig)
 						except:
-							ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(msg, addr, sig)
-
-
+							ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(msg if not msgIsFile else request.args['msg'][0], addr, sig)
 
 				return ret
 
@@ -1648,6 +1749,7 @@ if __name__ == '__main__':
 				print "Bad private key"
 
 			db.close()
+
 
 
 
