@@ -50,18 +50,33 @@ aversions[0] = 'Bitcoin';
 aversions[52] = 'Namecoin';
 aversions[111] = 'Testnet';
 
+wallet_dir = ""
+wallet_name = ""
+
 def iais(a):
-	return 's' if a>=2 else ''
+	if a>= 2:
+		return 's'
+	else:
+		return ''
 
 def determine_db_dir():
 	import os
 	import os.path
 	import platform
-	if platform.system() == "Darwin":
-		return os.path.expanduser("~/Library/Application Support/Bitcoin/")
-	elif platform.system() == "Windows":
-		return os.path.join(os.environ['APPDATA'], "Bitcoin")
-	return os.path.expanduser("~/.bitcoin")
+	if wallet_dir in "":
+		if platform.system() == "Darwin":
+			return os.path.expanduser("~/Library/Application Support/Bitcoin/")
+		elif platform.system() == "Windows":
+			return os.path.join(os.environ['APPDATA'], "Bitcoin")
+		return os.path.expanduser("~/.bitcoin")
+	else:
+		return wallet_dir
+
+def determine_db_name():
+	if wallet_name in "":
+		return "wallet.dat"
+	else:
+		return wallet_name
 
 # secp256k1
 
@@ -538,6 +553,10 @@ class KEY:
 	 def verify (self, hash, sig):
 		  return self.pubkey.verify_digest (sig, hash, sigdecode=ecdsa.util.sigdecode_der)
 
+def bool_to_int(b):
+	if b:
+		return 1
+	return 0
 
 class BCDataStream(object):
 	def __init__(self):
@@ -603,7 +622,7 @@ class BCDataStream(object):
 	def read_int64(self): return self._read_num('<q')
 	def read_uint64(self): return self._read_num('<Q')
 
-	def write_boolean(self, val): return self.write(chr(1) if val else chr(0))
+	def write_boolean(self, val): return self.write(chr(bool_to_int(val)))
 	def write_int16(self, val): return self._write_num('<h', val)
 	def write_uint16(self, val): return self._write_num('<H', val)
 	def write_int32(self, val): return self._write_num('<i', val)
@@ -648,7 +667,11 @@ class BCDataStream(object):
 
 def open_wallet(db_env, walletfile, writable=False):
 	db = DB(db_env)
-	flags = DB_THREAD | (DB_CREATE if writable else DB_RDONLY)
+	if writable:
+		DB_TYPEOPEN = DB_CREATE
+	else:
+		DB_TYPEOPEN = DB_RDONLY
+	flags = DB_THREAD | DB_TYPEOPEN
 	try:
 		r = db.open(walletfile, "main", DB_BTREE, flags)
 	except DBError:
@@ -902,6 +925,9 @@ def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
 	db.close()
 
 def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter, include_balance, vers=-1):
+	private_keys = []
+	private_hex_keys = []
+
 	if vers > -1:
 		global addrtype
 		oldaddrtype = addrtype
@@ -1109,6 +1135,10 @@ function ajax%s(){\n\
 \n\
 '%(name, command_when_ready, query_string, command_until_ready)
 
+def X_if_else(iftrue, cond, iffalse):
+	if cond:
+		return iftrue
+	return iffalse
 
 class WIRoot(resource.Resource):
 
@@ -1117,7 +1147,7 @@ class WIRoot(resource.Resource):
 
 			DWForm = WI_FormInit('Dump your wallet:', 'DumpWallet') + \
 						WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
-						WI_InputText('Wallet Filename: ', 'name', 'dwf-name', 'wallet.dat', 20) + \
+						WI_InputText('Wallet Filename: ', 'name', 'dwf-name', determine_db_name(), 20) + \
 						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
 						WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
 						WI_CloseButton('DWDiv', 'dwf-close') + \
@@ -1126,18 +1156,18 @@ class WIRoot(resource.Resource):
 
 			DTxForm = WI_FormInit('Dump your transactions to a file:', 'DumpTx') + \
 						WI_InputText('Wallet Directory: ', 'dir', 'dt-dir', determine_db_dir()) + \
-						WI_InputText('Wallet Filename: ', 'name', 'dt-name', 'wallet.dat', 20) + \
+						WI_InputText('Wallet Filename: ', 'name', 'dt-name', determine_db_name(), 20) + \
 						WI_InputText('Output file: ', 'file', 'dt-file', '') + \
 						WI_Submit('Dump tx\'s', 'DTxDiv', 'dt-close', 'ajaxDTx') + \
 						WI_CloseButton('DTxDiv', 'dt-close') + \
 						WI_ReturnDiv('DTxDiv') + \
 						WI_FormEnd()
 
-			InfoForm = WI_FormInit('Get some info about one key'+(' and sign/verify messages' if 'ecdsa' not in missing_dep else '')+':', 'Info') + \
+			InfoForm = WI_FormInit('Get some info about one key'+X_if_else(' and sign/verify messages', 'ecdsa' not in missing_dep,'')+':', 'Info') + \
 						WI_InputText('Key: ', 'key', 'if-key', '', 60) + \
-						(WI_InputText('Message: ', 'msg', 'if-msg', '', 30) if 'ecdsa' not in missing_dep else '') + \
-						(WI_InputText('Signature: ', 'sig', 'if-sig', '', 30) if 'ecdsa' not in missing_dep else '') + \
-						(WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30) if 'ecdsa' not in missing_dep else '') + \
+						X_if_else(WI_InputText('Message: ', 'msg', 'if-msg', '', 30), 'ecdsa' not in missing_dep, '') + \
+						X_if_else(WI_InputText('Signature: ', 'sig', 'if-sig', '', 30), 'ecdsa' not in missing_dep, '') + \
+						X_if_else(WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30), 'ecdsa' not in missing_dep, '') + \
 						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'if-vers', '0', 1) + \
 						"Format:<br />" + \
 						WI_RadioButton('format', 'reg', 'if-reg', 'CHECKED', ' Regular, base 58') + \
@@ -1154,7 +1184,7 @@ class WIRoot(resource.Resource):
 
 			ImportForm = WI_FormInit('Import a key into your wallet:', 'Import') + \
 						WI_InputText('Wallet Directory: ', 'dir', 'impf-dir', determine_db_dir(), 30) + \
-						WI_InputText('Wallet Filename:', 'name', 'impf-name', 'wallet.dat', 20) + \
+						WI_InputText('Wallet Filename:', 'name', 'impf-name', determine_db_name(), 20) + \
 						WI_InputText('Key:', 'key', 'impf-key', '', 65) + \
 						WI_InputText('Label:', 'label', 'impf-label', '') + \
 						WI_Checkbox('reserve', 'true', 'impf-reserve', 'onClick="document.getElementById(\'impf-label\').disabled=document.getElementById(\'impf-reserve\').checked"', ' Reserve') + \
@@ -1170,7 +1200,7 @@ class WIRoot(resource.Resource):
 
 			DeleteForm = WI_FormInit('Delete a key from your wallet:', 'Delete') + \
 						WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
-						WI_InputText('Wallet Filename:', 'name', 'd-name', 'wallet.dat') + \
+						WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
 						WI_InputText('Key:', 'key', 'd-key', '', 65) + \
 						"Type:<br />" + \
 						WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Key" to delete them all)') + \
@@ -1182,7 +1212,7 @@ class WIRoot(resource.Resource):
 
 			ImportTxForm = WI_FormInit('Import a transaction into your wallet:', 'ImportTx') + \
 						WI_InputText('Wallet Directory: ', 'dir', 'it-dir', determine_db_dir(), 40) + \
-						WI_InputText('Wallet Filename:', 'name', 'it-name', 'wallet.dat') + \
+						WI_InputText('Wallet Filename:', 'name', 'it-name', determine_db_name()) + \
 						WI_InputText('Txk:', 'key', 'it-txk', '', 65) + \
 						WI_InputText('Txv:', 'label', 'it-txv', '', 65) + \
 						WI_Submit('Import', 'ImportTxDiv', 'it-close', 'ajaxImportTx') + \
@@ -1462,22 +1492,22 @@ class WIInfo(resource.Resource):
 						ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
 #						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
 						ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
-						ret += '<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r) if (int(secret.encode('hex'), 16)>_r) else ''
+						ret += X_if_else('<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r), (int(secret.encode('hex'), 16)>_r), '')
 
 				if 'ecdsa' not in missing_dep and need & 2:
 					if sec is not '' and msg is not '':
 						if need & 1:
 							ret += "<br />"
-						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(msg if not msgIsFile else request.args['msg'][0], addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
+						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
 
 					if sig is not '' and msg is not '' and pubkey is not '':
 						addr = public_key_to_bc_address(pubkey.decode('hex'))
 						try:
 							verify_message_signature(pubkey, sig, msg, msgIsHex)
-							ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(msg if not msgIsFile else request.args['msg'][0], addr, sig)
+							ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
 						except:
-							ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(msg if not msgIsFile else request.args['msg'][0], addr, sig)
-
+							ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
+					
 				return ret
 
         except:
@@ -1523,7 +1553,7 @@ class WIImportTx(resource.Resource):
 	
 				db.close()
 
-				return "<pre>txk: %s\n%d transaction%s imported in %s/%s<pre>" % (txk, i, iais(i), wdir, wname)
+				return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]) i, iais(i), wdir, wname)
 
         except:
             log.err()
@@ -1682,6 +1712,13 @@ if __name__ == '__main__':
 		print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
 
 
+	if options.datadir is not None:
+		wallet_dir = options.datadir
+
+	if options.datadir is not None:
+		wallet_name = options.walletfile
+
+
 	if 'twisted' not in missing_dep and options.web is not None:
 		webport = 8989
 		if options.port is not None:
@@ -1705,11 +1742,6 @@ if __name__ == '__main__':
 		parser.print_help()
 		exit(0)
 
-	if options.datadir is None:
-		db_dir = determine_db_dir()
-	else:
-		db_dir = options.datadir
-
 	if options.testnet:
 		db_dir += "/testnet"
 		addrtype = 111
@@ -1729,9 +1761,11 @@ if __name__ == '__main__':
 			print "Bad private key"
 		exit(0)
 
+	db_dir = determine_db_dir()
+
 	db_env = create_env(db_dir)
 
-	read_wallet(json_db, db_env, options.walletfile, True, True, "", None)
+	read_wallet(json_db, db_env, determine_db_name(), True, True, "", None)
 
 	if options.dump:		
 		print json.dumps(json_db, sort_keys=True, indent=4)
@@ -1741,7 +1775,7 @@ if __name__ == '__main__':
 		elif (options.keyishex is None and options.key in private_keys) or (options.keyishex is not None and options.key in private_hex_keys):
 			print "Already exists"
 		else:	
-			db = open_wallet(db_env, options.walletfile, writable=True)
+			db = open_wallet(db_env, determine_db_name(), writable=True)
 
 			if importprivkey(db, options.key, options.label, options.reserve, options.keyishex):
 				print "Imported successfully"
