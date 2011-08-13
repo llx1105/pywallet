@@ -1553,7 +1553,7 @@ class WIImportTx(resource.Resource):
 	
 				db.close()
 
-				return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]) i, iais(i), wdir, wname)
+				return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]), i, iais(i), wdir, wname)
 
         except:
             log.err()
