@@ -53,6 +53,18 @@ aversions[111] = 'Testnet';
 wallet_dir = ""
 wallet_name = ""
 
+ko = 1e3
+kio = 1024
+Mo = 1e6
+Mio = 1024 ** 2
+Go = 1e9
+Gio = 1024 ** 3
+To = 1e12
+Tio = 1024 ** 4
+
+prekeys = ["82011302010104".decode('hex'), "82011202010104".decode('hex')]
+postkeys = ["a081a530".decode('hex'), "81a530".decode('hex')]
+
 def iais(a):
 	if a>= 2:
 		return 's'
@@ -483,6 +495,154 @@ def parse_setting(setting, vds):
 class SerializationError(Exception):
 	""" Thrown when there's a problem deserializing or serializing """
 
+def ts():
+	return int(time.mktime(datetime.now().timetuple()))
+
+def check_postkeys(key, postkeys):
+	for i in postkeys:
+		if key[:len(i)] == i:
+			return True
+	return False
+
+def one_element_in(a, string):
+	for i in a:
+		if i in string:
+			return True
+	return False
+
+def first_read(device, size, prekeys, inc=10000):
+	t0 = ts()-1
+	try:
+		fd = os.open (device, os.O_RDONLY)
+	except:
+		print("Can't open %s, check the path or try as root"%device)
+		exit(0)
+	prekey = prekeys[0]
+	data = ""
+	i = 0
+	data = os.read (fd, i)
+	before_contained_key = False
+	contains_key = False
+	ranges = []
+
+	while i < int(size):
+		if i%(10*Mio) > 0 and i%(10*Mio) <= inc:
+			print("\n%.2f/%.2f Go"%(i/1e9, size/1e9))
+			t = ts()
+			speed = i/(t-t0)
+			ETAts = size/speed + t0
+			d = datetime.fromtimestamp(ETAts)
+			print(d.strftime("   ETA: %H:%M:%S"))
+		
+		data = os.read (fd, inc)
+		contains_key = one_element_in(prekeys, data)
+
+		if not before_contained_key and contains_key:
+			ranges.append(i)
+
+		if before_contained_key and not contains_key:
+			ranges.append(i)
+
+		before_contained_key = contains_key
+
+		i += inc
+
+	os.close (fd)
+	return ranges
+
+def shrink_intervals(device, ranges, prekeys, inc=1000):
+	prekey = prekeys[0]
+	nranges = []
+	fd = os.open (device, os.O_RDONLY)
+	for j in range(len(ranges)/2):
+		before_contained_key = False
+		contains_key = False
+		bi = ranges[2*j]
+		bf = ranges[2*j+1]
+
+		mini_blocks = []
+		k = bi
+		while k <= bf + len(prekey) + 1:
+			mini_blocks.append(k)
+			k += inc
+			mini_blocks.append(k)
+
+		for k in range(len(mini_blocks)/2):
+			mini_blocks[2*k] -= len(prekey) +1
+			mini_blocks[2*k+1] += len(prekey) +1
+	
+
+			bi = mini_blocks[2*k]
+			bf = mini_blocks[2*k+1]
+
+			os.lseek(fd, bi, 0)
+
+			data = os.read(fd, bf-bi+1)
+			contains_key = one_element_in(prekeys, data)
+
+			if not before_contained_key and contains_key:
+				nranges.append(bi)
+
+			if before_contained_key and not contains_key:
+				nranges.append(bi+len(prekey) +1+len(prekey) +1)
+
+			before_contained_key = contains_key
+
+	os.close (fd)
+
+	return nranges
+
+def find_offsets(device, ranges, prekeys):
+	prekey = prekeys[0]
+	list_offsets = []
+	to_read = 0
+	fd = os.open (device, os.O_RDONLY)
+	for i in range(len(ranges)/2):
+		bi = ranges[2*i]-len(prekey)-1
+		os.lseek(fd, bi, 0)
+		bf = ranges[2*i+1]+len(prekey)+1
+		to_read += bf-bi+1
+		buf = ""
+		for j in range(len(prekey)):
+			buf += "\x00"
+		curs = bi
+
+		while curs <= bf:
+			data = os.read(fd, 1)
+			buf = buf[1:] + data
+			if buf in prekeys:
+				list_offsets.append(curs)
+			curs += 1
+
+	os.close (fd)
+
+	return [to_read, list_offsets]
+
+def read_keys(device, list_offsets):
+	found_hexkeys = []
+	fd = os.open (device, os.O_RDONLY)
+	for offset in list_offsets:
+		os.lseek(fd, offset+1, 0)
+		data = os.read(fd, 40)
+		hexkey = data[1:33].encode('hex')
+		after_key = data[33:39].encode('hex')
+		if hexkey not in found_hexkeys and check_postkeys(after_key.decode('hex'), postkeys):
+			found_hexkeys.append(hexkey)
+
+	os.close (fd)
+
+	return found_hexkeys
+
+def read_device_size(size):
+	if size[-2] == 'i':
+		unit = size[-3:]
+		value = float(size[:-3])
+	else:
+		unit = size[-2:]
+		value = float(size[:-2])
+	exec 'unit = %s' % unit
+	return int(value * unit)
+
 class KEY:
 
 	 def __init__ (self):
@@ -902,6 +1062,23 @@ def update_wallet(db, type, data):
 		print("ERROR writing to wallet.dat, type %s"%type)
 		print("data dictionary: %r"%data)
 		traceback.print_exc()
+
+def create_new_wallet(db_env, walletfile, version):
+	db_out = DB(db_env)
+
+	try:
+		r = db_out.open(walletfile, "main", DB_BTREE, DB_CREATE)
+	except DBError:
+		r = True
+
+	if r is not None:
+		logging.error("Couldn't open %s."%walletfile)
+		sys.exit(1)
+
+	db_out.put("0776657273696f6e".decode('hex'), ("%08x"%version).decode('hex')[::-1])
+
+	db_out.close()
+
 
 def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
 	db = open_wallet(db_env, walletfile)
@@ -1675,6 +1852,18 @@ if __name__ == '__main__':
 	parser.add_option("--port", dest="port",
 		help="port of web interface (defaults to 8989)")
 
+	parser.add_option("--recover", dest="recover", action="store_true",
+		help="recover your deleted keys, use with recov_size and recov_device")
+
+	parser.add_option("--recov_device", dest="recov_device",
+		help="device to read (e.g. /dev/sda1)")
+
+	parser.add_option("--recov_size", dest="recov_size",
+		help="number of bytes to read (e.g. 20Mo or 50Gio)")
+
+	parser.add_option("--recov_outputdir", dest="recov_outputdir",
+		help="output directory where the recovered wallet will be put")
+
 #	parser.add_option("--forcerun", dest="forcerun",
 #		action="store_true",
 #		help="run even if pywallet detects bitcoin is running")
@@ -1699,6 +1888,35 @@ if __name__ == '__main__':
 #		print('Bitcoin seems to be running: \n"%s"'%(aread))
 #		if options.forcerun is None:
 #			exit(0)
+
+	if options.recover:
+		if options.recov_size is None or options.recov_device is None or options.recov_outputdir is None:
+			print("You must provide the device, the number of bytes to read and the output directory")
+			exit(0)
+		device = options.recov_device
+		size = read_device_size(options.recov_size)
+		r = first_read(device, size, prekeys, 10000)
+		r = shrink_intervals(device, r, prekeys, 1000)
+		[to_read, o] = find_offsets(device, r, prekeys)
+		print("%dko to read"%(to_read/1000))
+		keys = read_keys(device, o)
+		print("%d key%s found"%(len(keys), iais(len(keys))))
+
+		db_env = create_env(options.recov_outputdir)
+		recov_wallet_name = "recovered_wallet_%s.dat"%ts()
+		create_new_wallet(db_env, recov_wallet_name, 32500)
+
+		db = open_wallet(db_env, recov_wallet_name, True)
+		i = 0
+		for sec in keys:
+			print("\nImporting key %4d/%d:"%(i+1, len(keys)))
+			importprivkey(db, sec, "recovered: %s"%sec, None, True)
+			i += 1
+		db.close()
+
+		print("\n\nThe new wallet %s/%s contains the %d recovered key%s\n"%(options.recov_outputdir, recov_wallet_name, len(keys), iais(len(keys))))
+
+		exit(0)
 
 
 	if 'bsddb' in missing_dep:
@@ -1783,6 +2001,7 @@ if __name__ == '__main__':
 				print "Bad private key"
 
 			db.close()
+
 
 
 
