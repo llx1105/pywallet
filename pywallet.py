@@ -1925,6 +1925,7 @@ if __name__ == '__main__':
 
 	if 'twisted' in missing_dep and options.web is not None:
 		print("'twisted' package is not installed, pywallet web interface can't be launched")
+		exit(0)
 
 	if 'ecdsa' in missing_dep:
 		print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
