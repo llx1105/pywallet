@@ -1921,15 +1921,16 @@ if __name__ == '__main__':
 	if 'ecdsa' in missing_dep:
 		print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
 
-	VIEWS = {
-		 'DumpWallet': WIDumpWallet(),
-		 'Import': WIImport(),
-		 'ImportTx': WIImportTx(),
-		 'DumpTx': WIDumpTx(),
-		 'Info': WIInfo(),
-		 'Delete': WIDelete(),
-		 'Balance': WIBalance()
-	}
+	if 'twisted' not in missing_dep:
+		VIEWS = {
+			 'DumpWallet': WIDumpWallet(),
+			 'Import': WIImport(),
+			 'ImportTx': WIImportTx(),
+			 'DumpTx': WIDumpTx(),
+			 'Info': WIInfo(),
+			 'Delete': WIDelete(),
+			 'Balance': WIBalance()
+		}
 
 	if options.datadir is not None:
 		wallet_dir = options.datadir
