@@ -1317,206 +1317,207 @@ def X_if_else(iftrue, cond, iffalse):
 		return iftrue
 	return iffalse
 
-class WIRoot(resource.Resource):
+if 'twisted' not in missing_dep:
+	class WIRoot(resource.Resource):
 
-    def render_GET(self, request):
-			header = '<h1>Pywallet Web Interface</h1><h3>CLOSE BITCOIN BEFORE USE!</h3><br /><br />'
+		 def render_GET(self, request):
+				header = '<h1>Pywallet Web Interface</h1><h3>CLOSE BITCOIN BEFORE USE!</h3><br /><br />'
 
-			DWForm = WI_FormInit('Dump your wallet:', 'DumpWallet') + \
-						WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
-						WI_InputText('Wallet Filename: ', 'name', 'dwf-name', determine_db_name(), 20) + \
-						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
-						WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
-						WI_CloseButton('DWDiv', 'dwf-close') + \
-						WI_ReturnDiv('DWDiv') + \
-						WI_FormEnd()
+				DWForm = WI_FormInit('Dump your wallet:', 'DumpWallet') + \
+							WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
+							WI_InputText('Wallet Filename: ', 'name', 'dwf-name', determine_db_name(), 20) + \
+							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
+							WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
+							WI_CloseButton('DWDiv', 'dwf-close') + \
+							WI_ReturnDiv('DWDiv') + \
+							WI_FormEnd()
 
-			DTxForm = WI_FormInit('Dump your transactions to a file:', 'DumpTx') + \
-						WI_InputText('Wallet Directory: ', 'dir', 'dt-dir', determine_db_dir()) + \
-						WI_InputText('Wallet Filename: ', 'name', 'dt-name', determine_db_name(), 20) + \
-						WI_InputText('Output file: ', 'file', 'dt-file', '') + \
-						WI_Submit('Dump tx\'s', 'DTxDiv', 'dt-close', 'ajaxDTx') + \
-						WI_CloseButton('DTxDiv', 'dt-close') + \
-						WI_ReturnDiv('DTxDiv') + \
-						WI_FormEnd()
+				DTxForm = WI_FormInit('Dump your transactions to a file:', 'DumpTx') + \
+							WI_InputText('Wallet Directory: ', 'dir', 'dt-dir', determine_db_dir()) + \
+							WI_InputText('Wallet Filename: ', 'name', 'dt-name', determine_db_name(), 20) + \
+							WI_InputText('Output file: ', 'file', 'dt-file', '') + \
+							WI_Submit('Dump tx\'s', 'DTxDiv', 'dt-close', 'ajaxDTx') + \
+							WI_CloseButton('DTxDiv', 'dt-close') + \
+							WI_ReturnDiv('DTxDiv') + \
+							WI_FormEnd()
 
-			InfoForm = WI_FormInit('Get some info about one key'+X_if_else(' and sign/verify messages', 'ecdsa' not in missing_dep,'')+':', 'Info') + \
-						WI_InputText('Key: ', 'key', 'if-key', '', 60) + \
-						X_if_else(WI_InputText('Message: ', 'msg', 'if-msg', '', 30), 'ecdsa' not in missing_dep, '') + \
-						X_if_else(WI_InputText('Signature: ', 'sig', 'if-sig', '', 30), 'ecdsa' not in missing_dep, '') + \
-						X_if_else(WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30), 'ecdsa' not in missing_dep, '') + \
-						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'if-vers', '0', 1) + \
-						"Format:<br />" + \
-						WI_RadioButton('format', 'reg', 'if-reg', 'CHECKED', ' Regular, base 58') + \
-						WI_RadioButton('format', 'hex', 'if-hex', '', ' Hexadecimal, 64 characters long') + \
-						"You want:<br />" + \
-						WI_RadioButton('i-need', '1', 'if-n-info', '', ' Info') + \
-						WI_RadioButton('i-need', '2', 'if-n-sv', '', ' Sign and verify') + \
-						WI_RadioButton('i-need', '3', 'if-n-both', 'CHECKED', ' Both') + \
-						WI_Submit('Get info', 'InfoDiv', 'if-close', 'ajaxInfo') + \
-						WI_CloseButton('InfoDiv', 'if-close') + \
-						WI_ReturnDiv('InfoDiv') + \
-						WI_FormEnd()
-
-
-			ImportForm = WI_FormInit('Import a key into your wallet:', 'Import') + \
-						WI_InputText('Wallet Directory: ', 'dir', 'impf-dir', determine_db_dir(), 30) + \
-						WI_InputText('Wallet Filename:', 'name', 'impf-name', determine_db_name(), 20) + \
-						WI_InputText('Key:', 'key', 'impf-key', '', 65) + \
-						WI_InputText('Label:', 'label', 'impf-label', '') + \
-						WI_Checkbox('reserve', 'true', 'impf-reserve', 'onClick="document.getElementById(\'impf-label\').disabled=document.getElementById(\'impf-reserve\').checked"', ' Reserve') + \
-						WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'impf-vers', '0', 1) + \
-						"Format:<br />" + \
-						WI_RadioButton('format', 'reg', 'impf-reg', 'CHECKED', ' Regular, base 58') + \
-						WI_RadioButton('format', 'hex', 'impf-hex', '', ' Hexadecimal, 64 characters long') + \
-						WI_Submit('Import key', 'ImportDiv', 'impf-close', 'ajaxImport') + \
-						WI_CloseButton('ImportDiv', 'impf-close') + \
-						WI_ReturnDiv('ImportDiv') + \
-						WI_FormEnd()
+				InfoForm = WI_FormInit('Get some info about one key'+X_if_else(' and sign/verify messages', 'ecdsa' not in missing_dep,'')+':', 'Info') + \
+							WI_InputText('Key: ', 'key', 'if-key', '', 60) + \
+							X_if_else(WI_InputText('Message: ', 'msg', 'if-msg', '', 30), 'ecdsa' not in missing_dep, '') + \
+							X_if_else(WI_InputText('Signature: ', 'sig', 'if-sig', '', 30), 'ecdsa' not in missing_dep, '') + \
+							X_if_else(WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30), 'ecdsa' not in missing_dep, '') + \
+							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'if-vers', '0', 1) + \
+							"Format:<br />" + \
+							WI_RadioButton('format', 'reg', 'if-reg', 'CHECKED', ' Regular, base 58') + \
+							WI_RadioButton('format', 'hex', 'if-hex', '', ' Hexadecimal, 64 characters long') + \
+							"You want:<br />" + \
+							WI_RadioButton('i-need', '1', 'if-n-info', '', ' Info') + \
+							WI_RadioButton('i-need', '2', 'if-n-sv', '', ' Sign and verify') + \
+							WI_RadioButton('i-need', '3', 'if-n-both', 'CHECKED', ' Both') + \
+							WI_Submit('Get info', 'InfoDiv', 'if-close', 'ajaxInfo') + \
+							WI_CloseButton('InfoDiv', 'if-close') + \
+							WI_ReturnDiv('InfoDiv') + \
+							WI_FormEnd()
 
 
-			DeleteForm = WI_FormInit('Delete a key from your wallet:', 'Delete') + \
-						WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
-						WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
-						WI_InputText('Key:', 'key', 'd-key', '', 65) + \
-						"Type:<br />" + \
-						WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Key" to delete them all)') + \
-						WI_RadioButton('d-type', 'key', 'd-r-key', '', ' Bitcoin address') + \
-						WI_Submit('Delete', 'DeleteDiv', 'd-close', 'ajaxDelete') + \
-						WI_CloseButton('DeleteDiv', 'd-close') + \
-						WI_ReturnDiv('DeleteDiv') + \
-						WI_FormEnd()
+				ImportForm = WI_FormInit('Import a key into your wallet:', 'Import') + \
+							WI_InputText('Wallet Directory: ', 'dir', 'impf-dir', determine_db_dir(), 30) + \
+							WI_InputText('Wallet Filename:', 'name', 'impf-name', determine_db_name(), 20) + \
+							WI_InputText('Key:', 'key', 'impf-key', '', 65) + \
+							WI_InputText('Label:', 'label', 'impf-label', '') + \
+							WI_Checkbox('reserve', 'true', 'impf-reserve', 'onClick="document.getElementById(\'impf-label\').disabled=document.getElementById(\'impf-reserve\').checked"', ' Reserve') + \
+							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'impf-vers', '0', 1) + \
+							"Format:<br />" + \
+							WI_RadioButton('format', 'reg', 'impf-reg', 'CHECKED', ' Regular, base 58') + \
+							WI_RadioButton('format', 'hex', 'impf-hex', '', ' Hexadecimal, 64 characters long') + \
+							WI_Submit('Import key', 'ImportDiv', 'impf-close', 'ajaxImport') + \
+							WI_CloseButton('ImportDiv', 'impf-close') + \
+							WI_ReturnDiv('ImportDiv') + \
+							WI_FormEnd()
 
-			ImportTxForm = WI_FormInit('Import a transaction into your wallet:', 'ImportTx') + \
-						WI_InputText('Wallet Directory: ', 'dir', 'it-dir', determine_db_dir(), 40) + \
-						WI_InputText('Wallet Filename:', 'name', 'it-name', determine_db_name()) + \
-						WI_InputText('Txk:', 'key', 'it-txk', '', 65) + \
-						WI_InputText('Txv:', 'label', 'it-txv', '', 65) + \
-						WI_Submit('Import', 'ImportTxDiv', 'it-close', 'ajaxImportTx') + \
-						WI_CloseButton('ImportTxDiv', 'it-close') + \
-						WI_ReturnDiv('ImportTxDiv') + \
-						WI_FormEnd()
 
-			BalanceForm = WI_FormInit('Print the balance of a Bitcoin address:', 'Balance') + \
-						WI_InputText('Key:', 'key', 'bf-key', '', 35) + \
-						'<input type=submit value="Get balance" onClick="ajaxBalance();return false;" /><div id="BalanceDiv"></div>' + \
-						WI_FormEnd()
+				DeleteForm = WI_FormInit('Delete a key from your wallet:', 'Delete') + \
+							WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
+							WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
+							WI_InputText('Key:', 'key', 'd-key', '', 65) + \
+							"Type:<br />" + \
+							WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Key" to delete them all)') + \
+							WI_RadioButton('d-type', 'key', 'd-r-key', '', ' Bitcoin address') + \
+							WI_Submit('Delete', 'DeleteDiv', 'd-close', 'ajaxDelete') + \
+							WI_CloseButton('DeleteDiv', 'd-close') + \
+							WI_ReturnDiv('DeleteDiv') + \
+							WI_FormEnd()
 
-			Misc = ''
+				ImportTxForm = WI_FormInit('Import a transaction into your wallet:', 'ImportTx') + \
+							WI_InputText('Wallet Directory: ', 'dir', 'it-dir', determine_db_dir(), 40) + \
+							WI_InputText('Wallet Filename:', 'name', 'it-name', determine_db_name()) + \
+							WI_InputText('Txk:', 'key', 'it-txk', '', 65) + \
+							WI_InputText('Txv:', 'label', 'it-txv', '', 65) + \
+							WI_Submit('Import', 'ImportTxDiv', 'it-close', 'ajaxImportTx') + \
+							WI_CloseButton('ImportTxDiv', 'it-close') + \
+							WI_ReturnDiv('ImportTxDiv') + \
+							WI_FormEnd()
 
-			Javascript = '<script language="javascript" type="text/javascript">\
-				function get_radio_value(radioform){\
-					var rad_val;\
-					for (var i=0; i < radioform.length; i++){\
-						if (radioform[i].checked){\
-							rad_val = radioform[i].value;\
+				BalanceForm = WI_FormInit('Print the balance of a Bitcoin address:', 'Balance') + \
+							WI_InputText('Key:', 'key', 'bf-key', '', 35) + \
+							'<input type=submit value="Get balance" onClick="ajaxBalance();return false;" /><div id="BalanceDiv"></div>' + \
+							WI_FormEnd()
+
+				Misc = ''
+
+				Javascript = '<script language="javascript" type="text/javascript">\
+					function get_radio_value(radioform){\
+						var rad_val;\
+						for (var i=0; i < radioform.length; i++){\
+							if (radioform[i].checked){\
+								rad_val = radioform[i].value;\
+							}\
 						}\
-					}\
-					return rad_val;\
-				}' + \
-			WI_AjaxFunction('DW', 'document.getElementById("DWDiv").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("DWDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('DTx', 'document.getElementById("DTxDiv").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("DTxDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('Balance', 'document.getElementById("BalanceDiv").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("BalanceDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('Delete', 'document.getElementById("DeleteDiv").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("DeleteDiv").innerHTML = "Loading...";') + \
-			WI_AjaxFunction('ImportTx', 'document.getElementById("ImportTxDiv").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("ImportTxDiv").innerHTML = "Loading...";') + \
-			'</script>'
+						return rad_val;\
+					}' + \
+				WI_AjaxFunction('DW', 'document.getElementById("DWDiv").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("DWDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('DTx', 'document.getElementById("DTxDiv").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("DTxDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Balance', 'document.getElementById("BalanceDiv").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("BalanceDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Delete', 'document.getElementById("DeleteDiv").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("DeleteDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('ImportTx', 'document.getElementById("ImportTxDiv").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("ImportTxDiv").innerHTML = "Loading...";') + \
+				'</script>'
 
-			page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + DTxForm + InfoForm + ImportForm + ImportTxForm + DeleteForm + BalanceForm + Misc + '</body></html>'
-			return page
+				page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + DWForm + DTxForm + InfoForm + ImportForm + ImportTxForm + DeleteForm + BalanceForm + Misc + '</body></html>'
+				return page
 
-    def getChild(self, name, request):
-        if name == '':
-            return self
-        else:
-            if name in VIEWS.keys():
-                return resource.Resource.getChild(self, name, request)
-            else:
-                return WI404()
+		 def getChild(self, name, request):
+		     if name == '':
+		         return self
+		     else:
+		         if name in VIEWS.keys():
+		             return resource.Resource.getChild(self, name, request)
+		         else:
+		             return WI404()
 
-class WIDumpWallet(resource.Resource):
+	class WIDumpWallet(resource.Resource):
 
-    def render_GET(self, request):
-        try:
-				wdir=request.args['dir'][0]
-				wname=request.args['name'][0]
-				version = int(request.args['version'][0])
-				log.msg('Wallet Dir: %s' %(wdir))
-				log.msg('Wallet Name: %s' %(wname))
+		 def render_GET(self, request):
+		     try:
+					wdir=request.args['dir'][0]
+					wname=request.args['name'][0]
+					version = int(request.args['version'][0])
+					log.msg('Wallet Dir: %s' %(wdir))
+					log.msg('Wallet Name: %s' %(wname))
 
-				if not os.path.isfile(wdir+"/"+wname):
-					return '%s/%s doesn\'t exist'%(wdir, wname)
+					if not os.path.isfile(wdir+"/"+wname):
+						return '%s/%s doesn\'t exist'%(wdir, wname)
 
-				read_wallet(json_db, create_env(wdir), wname, True, True, "", None, version)
-				return 'Wallet: %s/%s<br />Dump:<pre>%s</pre>'%(wdir, wname, json.dumps(json_db, sort_keys=True, indent=4))
-        except:
-            log.err()
-            return 'Error in dump page'
+					read_wallet(json_db, create_env(wdir), wname, True, True, "", None, version)
+					return 'Wallet: %s/%s<br />Dump:<pre>%s</pre>'%(wdir, wname, json.dumps(json_db, sort_keys=True, indent=4))
+		     except:
+		         log.err()
+		         return 'Error in dump page'
 
-        def render_POST(self, request):
-            return self.render_GET(request)
+		     def render_POST(self, request):
+		         return self.render_GET(request)
 
-class WIDumpTx(resource.Resource):
+	class WIDumpTx(resource.Resource):
 
-    def render_GET(self, request):
-        try:
-				wdir=request.args['dir'][0]
-				wname=request.args['name'][0]
-				jsonfile=request.args['file'][0]
-				log.msg('Wallet Dir: %s' %(wdir))
-				log.msg('Wallet Name: %s' %(wname))
+		 def render_GET(self, request):
+		     try:
+					wdir=request.args['dir'][0]
+					wname=request.args['name'][0]
+					jsonfile=request.args['file'][0]
+					log.msg('Wallet Dir: %s' %(wdir))
+					log.msg('Wallet Name: %s' %(wname))
 
-				if not os.path.isfile(wdir+"/"+wname):
-					return '%s/%s doesn\'t exist'%(wdir, wname)
-				if os.path.isfile(jsonfile):
-					return '%s exists'%(jsonfile)
+					if not os.path.isfile(wdir+"/"+wname):
+						return '%s/%s doesn\'t exist'%(wdir, wname)
+					if os.path.isfile(jsonfile):
+						return '%s exists'%(jsonfile)
 
-				read_wallet(json_db, create_env(wdir), wname, True, True, "", None)
-				write_jsonfile(jsonfile, json_db['tx'])
-				return 'Wallet: %s/%s<br />Transations dumped in %s'%(wdir, wname, jsonfile)
-        except:
-            log.err()
-            return 'Error in dumptx page'
+					read_wallet(json_db, create_env(wdir), wname, True, True, "", None)
+					write_jsonfile(jsonfile, json_db['tx'])
+					return 'Wallet: %s/%s<br />Transations dumped in %s'%(wdir, wname, jsonfile)
+		     except:
+		         log.err()
+		         return 'Error in dumptx page'
 
-        def render_POST(self, request):
-            return self.render_GET(request)
+		     def render_POST(self, request):
+		         return self.render_GET(request)
 
-class WIBalance(resource.Resource):
+	class WIBalance(resource.Resource):
 
-    def render_GET(self, request):
-        try:
-				return "%s"%str(balance(balance_site, request.args['key'][0]).encode('utf-8'))
-        except:
-            log.err()
-            return 'Error in balance page'
+		 def render_GET(self, request):
+		     try:
+					return "%s"%str(balance(balance_site, request.args['key'][0]).encode('utf-8'))
+		     except:
+		         log.err()
+		         return 'Error in balance page'
 
-        def render_POST(self, request):
-            return self.render_GET(request)
+		     def render_POST(self, request):
+		         return self.render_GET(request)
 
-class WIDelete(resource.Resource):
+	class WIDelete(resource.Resource):
 
-    def render_GET(self, request):
-        try:
-				wdir=request.args['dir'][0]
-				wname=request.args['name'][0]
-				keydel=request.args['keydel'][0]
-				typedel=request.args['typedel'][0]
-				db_env = create_env(wdir)
+		 def render_GET(self, request):
+		     try:
+					wdir=request.args['dir'][0]
+					wname=request.args['name'][0]
+					keydel=request.args['keydel'][0]
+					typedel=request.args['typedel'][0]
+					db_env = create_env(wdir)
 
-				if not os.path.isfile(wdir+"/"+wname):
-					return '%s/%s doesn\'t exist'%(wdir, wname)
+					if not os.path.isfile(wdir+"/"+wname):
+						return '%s/%s doesn\'t exist'%(wdir, wname)
 
-				deleted_items = delete_from_wallet(db_env, wname, typedel, keydel)
+					deleted_items = delete_from_wallet(db_env, wname, typedel, keydel)
 
-				return "%s:%s has been successfully deleted from %s/%s, resulting in %d deleted item%s"%(typedel, keydel, wdir, wname, deleted_items, iais(deleted_items))
+					return "%s:%s has been successfully deleted from %s/%s, resulting in %d deleted item%s"%(typedel, keydel, wdir, wname, deleted_items, iais(deleted_items))
 
-        except:
-            log.err()
-            return 'Error in delete page'
+		     except:
+		         log.err()
+		         return 'Error in delete page'
 
-        def render_POST(self, request):
-            return self.render_GET(request)
+		     def render_POST(self, request):
+		         return self.render_GET(request)
 
 def message_to_hash(msg, msgIsHex=False):
 	str = ""
