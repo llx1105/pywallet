@@ -1613,40 +1613,145 @@ def inverse_str(string):
 		ret += string[len(string)-2-2*i+1];
 	return ret
 
+if 'twisted' not in missing_dep:
+	class WIInfo(resource.Resource):
 
-class WIInfo(resource.Resource):
+		 def render_GET(self, request):
+		     global addrtype
+		     try:
+					sec = request.args['key'][0]
+					format = request.args['format'][0]
+					addrtype = int(request.args['vers'][0])
+					msgIsHex = False
+					msgIsFile = False
+					try:
+						msg = request.args['msg'][0]
+						if msg[0:4] == "Hex:":
+							msg = msg[4:]
+							msgIsHex = True
+						elif msg[0:5] == "File:":
+							msg = msg[5:]
+							if not os.path.isfile(msg):
+								return '%s doesn\'t exist'%(msg)
+							filin = open(msg, 'r')
+							msg = filin.read()
+							filin.close()
+							msgIsFile = True
 
-    def render_GET(self, request):
-        global addrtype
-        try:
-				sec = request.args['key'][0]
-				format = request.args['format'][0]
-				addrtype = int(request.args['vers'][0])
-				msgIsHex = False
-				msgIsFile = False
-				try:
-					msg = request.args['msg'][0]
-					if msg[0:4] == "Hex:":
-						msg = msg[4:]
-						msgIsHex = True
-					elif msg[0:5] == "File:":
-						msg = msg[5:]
-						if not os.path.isfile(msg):
-							return '%s doesn\'t exist'%(msg)
-						filin = open(msg, 'r')
-						msg = filin.read()
-						filin.close()
-						msgIsFile = True
-
-					sig = request.args['sig'][0]
-					pubkey = request.args['pubkey'][0]
-					need = int(request.args['need'][0])
-				except:
-					need = 1
+						sig = request.args['sig'][0]
+						pubkey = request.args['pubkey'][0]
+						need = int(request.args['need'][0])
+					except:
+						need = 1
 				
-				ret = ""
+					ret = ""
 
-				if sec is not '':
+					if sec is not '':
+						if format in 'reg':
+							pkey = regenerate_key(sec)
+						elif len(sec) == 64:
+							pkey = EC_KEY(str_to_long(sec.decode('hex')))
+						else:
+							return "Hexadecimal private keys must be 64 characters long"
+
+						if not pkey:
+							return "Bad private key"
+
+						secret = GetSecret(pkey)
+						private_key = GetPrivKey(pkey)
+						public_key = GetPubKey(pkey)
+						addr = public_key_to_bc_address(public_key)
+
+						if need & 1:
+							ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
+							ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret))
+							ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
+							ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
+	#						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
+							ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
+							ret += X_if_else('<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r), (int(secret.encode('hex'), 16)>_r), '')
+
+					if 'ecdsa' not in missing_dep and need & 2:
+						if sec is not '' and msg is not '':
+							if need & 1:
+								ret += "<br />"
+							ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
+
+						if sig is not '' and msg is not '' and pubkey is not '':
+							addr = public_key_to_bc_address(pubkey.decode('hex'))
+							try:
+								verify_message_signature(pubkey, sig, msg, msgIsHex)
+								ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
+							except:
+								ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
+					
+					return ret
+
+		     except:
+		         log.err()
+		         return 'Error in info page'
+
+		     def render_POST(self, request):
+		         return self.render_GET(request)
+
+
+	class WIImportTx(resource.Resource):
+
+		 def render_GET(self, request):
+		     global addrtype
+		     try:
+					wdir=request.args['dir'][0]
+					wname=request.args['name'][0]
+					txk=request.args['txk'][0]
+					txv=request.args['txv'][0]
+					d = {}
+
+					if not os.path.isfile(wdir+"/"+wname):
+						return '%s/%s doesn\'t exist'%(wdir, wname)
+
+					if txk not in "file":
+						dd = [{'tx_k':txk, 'tx_v':txv}]
+					else:
+						if not os.path.isfile(txv):
+							return '%s doesn\'t exist'%(txv)
+						dd = read_jsonfile(txv)
+
+
+					db_env = create_env(wdir)
+					read_wallet(json_db, db_env, wname, True, True, "", None)
+					db = open_wallet(db_env, wname, writable=True)
+
+					i=0
+					for tx in dd:
+						d = {'txi':tx['tx_k'], 'txv':tx['tx_v']}
+						print(d)
+						update_wallet(db, "tx", d)
+						i+=1
+	
+					db.close()
+
+					return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]), i, iais(i), wdir, wname)
+
+		     except:
+		         log.err()
+		         return 'Error in importtx page'
+
+		     def render_POST(self, request):
+		         return self.render_GET(request)
+
+	class WIImport(resource.Resource):
+
+		 def render_GET(self, request):
+		     global addrtype
+		     try:
+					sec = request.args['key'][0]
+					format = request.args['format'][0]
+					addrtype = int(request.args['vers'][0])
+					wdir=request.args['dir'][0]
+					wname=request.args['name'][0]
+					reserve=request.args.has_key('reserve')
+					label=request.args['label'][0]
+				
 					if format in 'reg':
 						pkey = regenerate_key(sec)
 					elif len(sec) == 64:
@@ -1657,146 +1762,41 @@ class WIInfo(resource.Resource):
 					if not pkey:
 						return "Bad private key"
 
+					if not os.path.isfile(wdir+"/"+wname):
+						return '%s/%s doesn\'t exist'%(wdir, wname)
+
+
 					secret = GetSecret(pkey)
 					private_key = GetPrivKey(pkey)
 					public_key = GetPubKey(pkey)
 					addr = public_key_to_bc_address(public_key)
 
-					if need & 1:
-						ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
-						ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret))
-						ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
-						ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
-#						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
-						ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
-						ret += X_if_else('<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r), (int(secret.encode('hex'), 16)>_r), '')
+					db_env = create_env(wdir)
+					read_wallet(json_db, db_env, wname, True, True, "", None)
+					db = open_wallet(db_env, wname, writable=True)
 
-				if 'ecdsa' not in missing_dep and need & 2:
-					if sec is not '' and msg is not '':
-						if need & 1:
-							ret += "<br />"
-						ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
+					if (format in 'reg' and sec in private_keys) or (format not in 'reg' and sec in private_hex_keys):
+						return "Already exists"
 
-					if sig is not '' and msg is not '' and pubkey is not '':
-						addr = public_key_to_bc_address(pubkey.decode('hex'))
-						try:
-							verify_message_signature(pubkey, sig, msg, msgIsHex)
-							ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
-						except:
-							ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
-					
-				return ret
-
-        except:
-            log.err()
-            return 'Error in info page'
-
-        def render_POST(self, request):
-            return self.render_GET(request)
-
-
-class WIImportTx(resource.Resource):
-
-    def render_GET(self, request):
-        global addrtype
-        try:
-				wdir=request.args['dir'][0]
-				wname=request.args['name'][0]
-				txk=request.args['txk'][0]
-				txv=request.args['txv'][0]
-				d = {}
-
-				if not os.path.isfile(wdir+"/"+wname):
-					return '%s/%s doesn\'t exist'%(wdir, wname)
-
-				if txk not in "file":
-					dd = [{'tx_k':txk, 'tx_v':txv}]
-				else:
-					if not os.path.isfile(txv):
-						return '%s doesn\'t exist'%(txv)
-					dd = read_jsonfile(txv)
-
-
-				db_env = create_env(wdir)
-				read_wallet(json_db, db_env, wname, True, True, "", None)
-				db = open_wallet(db_env, wname, writable=True)
-
-				i=0
-				for tx in dd:
-					d = {'txi':tx['tx_k'], 'txv':tx['tx_v']}
-					print(d)
-					update_wallet(db, "tx", d)
-					i+=1
+					update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
+					if not reserve:
+						update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
 	
-				db.close()
+					db.close()
 
-				return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]), i, iais(i), wdir, wname)
+					return "<pre>Address: %s\nPrivkey: %s\nHexkey: %s\nKey imported in %s/%s<pre>" % (addr, SecretToASecret(secret), secret.encode('hex'), wdir, wname)
 
-        except:
-            log.err()
-            return 'Error in importtx page'
+		     except:
+		         log.err()
+		         return 'Error in import page'
 
-        def render_POST(self, request):
-            return self.render_GET(request)
+		     def render_POST(self, request):
+		         return self.render_GET(request)
 
-class WIImport(resource.Resource):
+	class WI404(resource.Resource):
 
-    def render_GET(self, request):
-        global addrtype
-        try:
-				sec = request.args['key'][0]
-				format = request.args['format'][0]
-				addrtype = int(request.args['vers'][0])
-				wdir=request.args['dir'][0]
-				wname=request.args['name'][0]
-				reserve=request.args.has_key('reserve')
-				label=request.args['label'][0]
-				
-				if format in 'reg':
-					pkey = regenerate_key(sec)
-				elif len(sec) == 64:
-					pkey = EC_KEY(str_to_long(sec.decode('hex')))
-				else:
-					return "Hexadecimal private keys must be 64 characters long"
-
-				if not pkey:
-					return "Bad private key"
-
-				if not os.path.isfile(wdir+"/"+wname):
-					return '%s/%s doesn\'t exist'%(wdir, wname)
-
-
-				secret = GetSecret(pkey)
-				private_key = GetPrivKey(pkey)
-				public_key = GetPubKey(pkey)
-				addr = public_key_to_bc_address(public_key)
-
-				db_env = create_env(wdir)
-				read_wallet(json_db, db_env, wname, True, True, "", None)
-				db = open_wallet(db_env, wname, writable=True)
-
-				if (format in 'reg' and sec in private_keys) or (format not in 'reg' and sec in private_hex_keys):
-					return "Already exists"
-
-				update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
-				if not reserve:
-					update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
-	
-				db.close()
-
-				return "<pre>Address: %s\nPrivkey: %s\nHexkey: %s\nKey imported in %s/%s<pre>" % (addr, SecretToASecret(secret), secret.encode('hex'), wdir, wname)
-
-        except:
-            log.err()
-            return 'Error in import page'
-
-        def render_POST(self, request):
-            return self.render_GET(request)
-
-class WI404(resource.Resource):
-
-    def render_GET(self, request):
-        return 'Page Not Found'
+		 def render_GET(self, request):
+		     return 'Page Not Found'
 
 
 from optparse import OptionParser
@@ -1870,16 +1870,6 @@ if __name__ == '__main__':
 
 	(options, args) = parser.parse_args()
 
-	VIEWS = {
-		 'DumpWallet': WIDumpWallet(),
-		 'Import': WIImport(),
-		 'ImportTx': WIImportTx(),
-		 'DumpTx': WIDumpTx(),
-		 'Info': WIInfo(),
-		 'Delete': WIDelete(),
-		 'Balance': WIBalance()
-	}
-
 #	a=Popen("ps xa | grep ' bitcoin'", shell=True, bufsize=-1, stdout=PIPE).stdout
 #	aread=a.read()
 #	nl = aread.count("\n")
@@ -1930,6 +1920,15 @@ if __name__ == '__main__':
 	if 'ecdsa' in missing_dep:
 		print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
 
+	VIEWS = {
+		 'DumpWallet': WIDumpWallet(),
+		 'Import': WIImport(),
+		 'ImportTx': WIImportTx(),
+		 'DumpTx': WIDumpTx(),
+		 'Info': WIInfo(),
+		 'Delete': WIDelete(),
+		 'Balance': WIBalance()
+	}
 
 	if options.datadir is not None:
 		wallet_dir = options.datadir
