@@ -12,7 +12,21 @@ except:
 	missing_dep.append('bsddb')
 
 import os, sys, time
-import json
+try:
+	for i in os.listdir('/usr/lib/python2.5/site-packages'):
+		if 'Twisted' in i:
+			sys.path.append('/usr/lib/python2.5/site-packages/'+i)
+except:
+	''
+
+try:
+    import json
+except:
+	try:
+		 import simplejson as json
+	except:
+		 print("Json or simplejson package is needed")
+
 import logging
 import struct
 import StringIO
@@ -1270,7 +1284,7 @@ def WI_CloseButton(local_block, local_button):
 	return '<input type=button value="Close" onClick="document.getElementById(\'%s\').style.display=\'none\';document.getElementById(\'%s\').style.display=\'none\';" id="%s" style="display:none;" />'%(local_block, local_button, local_button)
 
 def WI_ReturnDiv(local_block):
-	return '<div id="%s" style="display:none;margin:10px 3%% 10px;padding:10px;overflow:auto;width:50%%;max-height:600px;background-color:#fff8dd;"></div>'%(local_block)
+	return '<div id="%s" style="display:none;margin:10px 3%% 10px;padding:10px;overflow:auto;width:90%%;max-height:600px;background-color:#fff8dd;"></div>'%(local_block)
 
 def WI_FormEnd():
 	return '</form><br />'
@@ -1417,7 +1431,7 @@ if 'twisted' not in missing_dep:
 					}' + \
 				WI_AjaxFunction('DW', 'document.getElementById("DWDiv").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("DWDiv").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('DTx', 'document.getElementById("DTxDiv").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("DTxDiv").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Info', 'document.getElementById("InfoDiv").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("InfoDiv").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Balance', 'document.getElementById("BalanceDiv").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("BalanceDiv").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Delete', 'document.getElementById("DeleteDiv").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("DeleteDiv").innerHTML = "Loading...";') + \
