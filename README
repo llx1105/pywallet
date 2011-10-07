@@ -34,7 +34,7 @@ Options:
 Install dependencies:
 
 Debian-based Linux:
- aptitude install build-esential python-dev python-twisted python-bsddb3
+ aptitude install build-essential python-dev python-twisted python-bsddb3
 
 OSX, proposed by defxor:
  1. Install Macports from http://www.macports.org/
