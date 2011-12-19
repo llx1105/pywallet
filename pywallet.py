@@ -1956,6 +1956,9 @@ if __name__ == '__main__':
 			 'Balance': WIBalance()
 		}
 
+	if options.dcv is not None:
+		max_version = 10 ** 9
+
 	if options.datadir is not None:
 		wallet_dir = options.datadir
 
