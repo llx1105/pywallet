@@ -1887,7 +1887,7 @@ if __name__ == '__main__':
 		help="output directory where the recovered wallet will be put")
 
 	parser.add_option("--dont_check_walletversion", dest="dcv", action="store_true",
-		help="don't check if wallet version > %d before running"%max_version)
+		help="don't check if wallet version > %d before running (WARNING: this may break your wallet, be sure you know what you do)"%max_version)
 
 #	parser.add_option("--forcerun", dest="forcerun",
 #		action="store_true",
