@@ -548,7 +548,14 @@ def first_read(device, size, prekeys, inc=10000):
 			d = datetime.fromtimestamp(ETAts)
 			print(d.strftime("   ETA: %H:%M:%S"))
 		
-		data = os.read (fd, inc)
+		try:
+			data = os.read (fd, inc)
+		except Exception as exc:
+			os.lseek(fd, inc, os.SEEK_CUR)
+			print str(exc)
+			i += inc
+			continue
+
 		contains_key = one_element_in(prekeys, data)
 
 		if not before_contained_key and contains_key:
@@ -1878,6 +1885,9 @@ if __name__ == '__main__':
 
 	parser.add_option("--recov_outputdir", dest="recov_outputdir",
 		help="output directory where the recovered wallet will be put")
+
+	parser.add_option("--dont_check_walletversion", dest="dcv", action="store_true",
+		help="don't check if wallet version > %d before running"%max_version)
 
 #	parser.add_option("--forcerun", dest="forcerun",
 #		action="store_true",
