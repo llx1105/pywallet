@@ -3260,7 +3260,6 @@ if __name__ == '__main__':
 #		print('Bitcoin seems to be running: \n"%s"'%(aread))
 #		if options.forcerun is None:
 #			exit(0)
-	global passphrase
 
 	if options.passphrase:
 		passphrase = options.passphrase
