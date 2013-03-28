@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-pywversion="2.0b8-bt"
+pywversion="2.0b9-bt"
 never_update=False
 
 #
@@ -2145,7 +2145,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 	for k in json_db['keys']:
 		i+=1
 		addr = k['addr']
-		if include_balance is not None:
+		if include_balance:
 #			print("%3d/%d  %s  %s" % (i, nkeys, k["addr"], k["balance"]))
 			k["balance"] = balance(balance_site, k["addr"])
 #			print("  %s" % (i, nkeys, k["addr"], k["balance"]))
@@ -3260,6 +3260,7 @@ if __name__ == '__main__':
 #		print('Bitcoin seems to be running: \n"%s"'%(aread))
 #		if options.forcerun is None:
 #			exit(0)
+	global passphrase
 
 	if options.passphrase:
 		passphrase = options.passphrase
