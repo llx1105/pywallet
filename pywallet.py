@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-pywversion="2.0b9-bt"
+pywversion="1.9"
 never_update=False
 
 #
@@ -2969,14 +2969,15 @@ if 'twisted' not in missing_dep:
 						if not pkey:
 							return "Bad private key"
 
+
 						secret = GetSecret(pkey)
-						private_key = GetPrivKey(pkey)
-						public_key = GetPubKey(pkey)
+						private_key = GetPrivKey(pkey, compressed)
+						public_key = GetPubKey(pkey, compressed)
 						addr = public_key_to_bc_address(public_key)
 
 						if need & 1:
 							ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
-							ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret))
+							ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret, compressed))
 							ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
 							ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
 	#						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
