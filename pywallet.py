@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-pywversion="1.9"
+pywversion="1.9.1"
 never_update=False
 
 #
@@ -2456,10 +2456,8 @@ if 'twisted' not in missing_dep:
 					True
 
 				uptodate=md5_last_pywallet[1]==md5_pywallet
-				uptodate=not uptodate
 				checking_finished=bool(md5_last_pywallet[0])
 		
-				checking_finished,uptodate=[True,False]
 				color="#DDDDFF"
 				if checking_finished:
 					if uptodate:
