@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-pywversion="1.9.2"
+pywversion="1.9.3"
 never_update=False
 
 #
