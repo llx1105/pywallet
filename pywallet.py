@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-pywversion="1.9.1"
+pywversion="1.9.2"
 never_update=False
 
 #
@@ -1431,7 +1431,7 @@ def md5_2(a):
 	return hashlib.md5(a).digest()
 
 def md5_file(nf):
-	fichier = file(nf, 'r').read()[:-1]
+	fichier = file(nf, 'r').read()
 	return md5_2(fichier)
 
 def md5_onlinefile(add):
