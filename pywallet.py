@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-pywversion="1.9.3"
+pywversion="1.9.4"
 never_update=False
 
 #
@@ -1779,7 +1779,7 @@ def delete_from_wallet(db_env, walletfile, typedel, keydel):
 					db.delete(key)
 					deleted_items+=1
 		elif typedel == "key":
-			if type == "key":
+			if type == "key" or type == "ckey":
 				if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
 					db.delete(key)
 					deleted_items+=1
