@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0"
+pywversion="2.0.1"
 never_update=False
 
 #
@@ -2787,6 +2787,7 @@ def html_wui(listcontent,uptodate_text):
 					<li id="PassphrasePageButton"><a href="#" accesskey="5" title="" onclick=" """+onclick_on_tab('PassphrasePage')+""" " >Passphrase</a></li>
 					<li id="TxPageButton"><a href="#" accesskey="6" title="" onclick=" """+onclick_on_tab('TxPage')+""" " >Transaction</a></li>
 					<li id="AboutPageButton"><a href="#" accesskey="7" title="" onclick=" """+onclick_on_tab('AboutPage')+""" " >About</a></li>
+					<li id="QuitPageButton"><a href="quit">Stop</a></li>
 				</ul>
 			</div>
 	</div>
@@ -3949,6 +3950,12 @@ if 'twisted' not in missing_dep:
 			 def render_POST(self, request):
 				 return self.render_GET(request)
 
+	class WIQuit(resource.Resource):
+		def render_GET(self, request):
+			reactor.stop()
+		def render_POST(self, request):
+			return self.render_GET(request)
+
 	class WICTListTx(resource.Resource):
 		def render_GET(self, request):
 			global CTX_adds
@@ -4400,7 +4407,8 @@ if __name__ == '__main__':
 			 'CTTest': WICTTest(),
 			 'ListTransactions': WICTListTx(),
 			 'CreateTransaction': WICT(),
-			 'CT': WICT()
+			 'CT': WICT(),
+			 'quit': WIQuit()
 
 		}
 
