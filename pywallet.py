@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.1"
+pywversion="2.0.2"
 never_update=False
 
 #
@@ -2189,6 +2189,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 	if crypted and passphrase:
 		check = True
+		ppcorrect=True
 		for k in json_db['keys']:
 		  if 'encrypted_privkey' in k:
 			ckey = k['encrypted_privkey'].decode('hex')
@@ -2203,6 +2204,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 				pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
 				if public_key != GetPubKey(pkey, compressed):
 					print "The wallet is crypted and the passphrase is incorrect"
+					ppcorrect=False
 					break
 
 			sec = SecretToASecret(secret, compressed)
@@ -2215,7 +2217,8 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 #			del(k['secret'])
 #			del(k['pubkey'])
 			private_keys.append(sec)
-		print "The wallet is crypted and the passphrase is correct"
+		if ppcorrect:
+			print "The wallet is crypted and the passphrase is correct"
 
 	for k in json_db['keys']:
 		if k['compressed'] and 'secret' in k:
