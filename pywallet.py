@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.3"
+pywversion="2.0.4"
 never_update=False
 
 #
@@ -4143,18 +4143,19 @@ if 'twisted' not in missing_dep:
 			 try:
                                 pub=request.args['pub'][0]
                                 try:
-                                        wdir=request.args['dir'][0]
-                                        wname=request.args['name'][0]
-                                        addrtype = int(request.args['vers'][0])
-                                        label=request.args['label'][0]
-                                        
-                                        db_env = create_env(wdir)
-                                        db = open_wallet(db_env, wname, writable=True)
-                                        update_wallet(db, 'ckey', { 'public_key' : pub.decode('hex'), 'encrypted_private_key' : random_string(96).decode('hex') })
-                                        db.close()
-                                        return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" imported"
+										wdir=request.args['dir'][0]
+										wname=request.args['name'][0]
+										addrtype = int(request.args['vers'][0])
+										label=request.args['label'][0]
+										
+										db_env = create_env(wdir)
+										db = open_wallet(db_env, wname, writable=True)
+										update_wallet(db, 'ckey', { 'public_key' : pub.decode('hex'), 'encrypted_private_key' : random_string(96).decode('hex') })
+										update_wallet(db, 'name', { 'hash' : public_key_to_bc_address(pub.decode('hex')), 'name' : "Read-only: "+label })
+										db.close()
+										return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" imported"
         			except:
-                                        return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" not imported"
+										return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" not imported"
 			 except:
                                 pass
                         
