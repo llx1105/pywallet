@@ -3101,10 +3101,10 @@ if 'twisted' not in missing_dep:
 #							WI_RadioButton('format', 'hex', 'impf-hex', '', ' Hexadecimal, 64 characters long') + \
 
 
-				ImportROForm = WI_FormInit('Import a read-only address:', 'Import', 'divformimportro') + \
+				ImportROForm = WI_FormInit('Import a read-only address (encrypted wallets only):', 'Import', 'divformimportro') + \
 							WI_InputText('Wallet Directory: ', 'dir', 'irof-dir', determine_db_dir(), 30) + \
 							WI_InputText('Wallet Filename:', 'name', 'irof-name', determine_db_name(), 20) + \
-							WI_InputText('Public key: ', 'pub', 'irof-pub', '', 40) + \
+							WI_InputText('Public key (starting with 04): ', 'pub', 'irof-pub', '', 40) + \
 							WI_InputText('Label: ', 'label', 'irof-label', '') + \
 							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'irof-vers', '0', 1) + \
 							WI_Submit('Import address', 'ImportDiv', 'irof-close', 'ajaxImportRO') + \
