@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.4"
+pywversion="2.0.5"
 never_update=False
 
 #
@@ -3106,7 +3106,6 @@ if 'twisted' not in missing_dep:
 							WI_InputText('Wallet Filename:', 'name', 'irof-name', determine_db_name(), 20) + \
 							WI_InputText('Public key (starting with 04): ', 'pub', 'irof-pub', '', 40) + \
 							WI_InputText('Label: ', 'label', 'irof-label', '') + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'irof-vers', '0', 1) + \
 							WI_Submit('Import address', 'ImportDiv', 'irof-close', 'ajaxImportRO') + \
 							WI_CloseButton('ImportRODiv', 'irof-close') + \
 							WI_ReturnDiv('ImportRODiv') + \
@@ -3193,7 +3192,7 @@ if 'twisted' not in missing_dep:
 				WI_AjaxFunction('DTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Info', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Import', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&com="+document.getElementById("impf-com").checked+"&cry="+document.getElementById("impf-cry").checked+"&format="+document.getElementById("impf-hex").checked+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('ImportRO', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("irof-dir").value+"&name="+document.getElementById("irof-name").value+"&pub="+document.getElementById("irof-pub").value+"&label="+document.getElementById("irof-label").value+"&vers="+document.getElementById("irof-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('ImportRO', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("irof-dir").value+"&name="+document.getElementById("irof-name").value+"&pub="+document.getElementById("irof-pub").value+"&label="+document.getElementById("irof-label").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balancekey="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Delete', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('ImportTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
@@ -4145,7 +4144,6 @@ if 'twisted' not in missing_dep:
                                 try:
 										wdir=request.args['dir'][0]
 										wname=request.args['name'][0]
-										addrtype = int(request.args['vers'][0])
 										label=request.args['label'][0]
 										
 										db_env = create_env(wdir)
