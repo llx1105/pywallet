@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.2"
+pywversion="2.0.3"
 never_update=False
 
 #
@@ -3101,6 +3101,17 @@ if 'twisted' not in missing_dep:
 #							WI_RadioButton('format', 'hex', 'impf-hex', '', ' Hexadecimal, 64 characters long') + \
 
 
+				ImportROForm = WI_FormInit('Import a read-only address:', 'Import', 'divformimportro') + \
+							WI_InputText('Wallet Directory: ', 'dir', 'irof-dir', determine_db_dir(), 30) + \
+							WI_InputText('Wallet Filename:', 'name', 'irof-name', determine_db_name(), 20) + \
+							WI_InputText('Public key: ', 'pub', 'irof-pub', '', 40) + \
+							WI_InputText('Label: ', 'label', 'irof-label', '') + \
+							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'irof-vers', '0', 1) + \
+							WI_Submit('Import address', 'ImportDiv', 'irof-close', 'ajaxImportRO') + \
+							WI_CloseButton('ImportRODiv', 'irof-close') + \
+							WI_ReturnDiv('ImportRODiv') + \
+							WI_FormEnd()
+
 				DeleteForm = WI_FormInit('Delete a key from your wallet:', 'Delete', 'divformdelete') + \
 							WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
 							WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
@@ -3182,7 +3193,8 @@ if 'twisted' not in missing_dep:
 				WI_AjaxFunction('DTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Info', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Import', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&com="+document.getElementById("impf-com").checked+"&cry="+document.getElementById("impf-cry").checked+"&format="+document.getElementById("impf-hex").checked+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('ImportRO', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("irof-dir").value+"&name="+document.getElementById("irof-name").value+"&pub="+document.getElementById("irof-pub").value+"&label="+document.getElementById("irof-label").value+"&vers="+document.getElementById("irof-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balancekey="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Delete', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('ImportTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				'</script>'
@@ -3206,7 +3218,7 @@ To support pywallet's development or if you think it's worth something, you can 
 				
 				return html_wui(Javascript + \
 					WI_Endiv(DWForm+DKForm+DTxForm, 'DumpPage', 'Dump', '') + \
-					WI_Endiv(ImportForm+IKForm+MWForm+ImportTxForm,'ImportPage', 'Import', "Don't forget to close Bitcoin when you modify your wallet", True) + \
+					WI_Endiv(ImportForm+IKForm+MWForm+ImportTxForm+ImportROForm,'ImportPage', 'Import', "Don't forget to close Bitcoin when you modify your wallet", True) + \
 					WI_Endiv(DeleteForm,'DeletePage', 'Delete', "Don't forget to close Bitcoin when you modify your wallet", True) + \
 					WI_Endiv(CPPForm,'PassphrasePage', 'Change passphrase', '', True) + \
 					WI_Endiv(InfoForm+BalanceForm,'InfoPage', 'Info', '', True) + \
@@ -4128,6 +4140,24 @@ if 'twisted' not in missing_dep:
 
 		 def render_GET(self, request):
 			 global addrtype
+			 try:
+                                pub=request.args['pub'][0]
+                                try:
+                                        wdir=request.args['dir'][0]
+                                        wname=request.args['name'][0]
+                                        addrtype = int(request.args['vers'][0])
+                                        label=request.args['label'][0]
+                                        
+                                        db_env = create_env(wdir)
+                                        db = open_wallet(db_env, wname, writable=True)
+                                        update_wallet(db, 'ckey', { 'public_key' : pub.decode('hex'), 'encrypted_private_key' : random_string(96).decode('hex') })
+                                        db.close()
+                                        return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" imported"
+        			except:
+                                        return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" not imported"
+			 except:
+                                pass
+                        
 			 try:
 
 					wdir=request.args['dir'][0]
