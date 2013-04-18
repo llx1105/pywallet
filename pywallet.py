@@ -4258,18 +4258,17 @@ def update_pyw():
 			filout.write(dl)
 			filout.close()
 			thread.start_new_thread(restart_pywallet, ())
-			return "Updated, please wait..."
+			return "Updated, restarting..."
 		else:
 			return "Problem when downloading new version ("+md5_2(dl)+"/"+md5_last_pywallet[1]+")"
 
 def restart_pywallet():
-	time.sleep(1)
 	thread.start_new_thread(start_pywallet, ())
-	time.sleep(0.3)
+	time.sleep(2)
 	reactor.stop()
 
 def start_pywallet():
-	a=Popen("python "+pyw_path+"/"+pyw_filename+" --web --port "+str(webport)+" --wait 2", shell=True, bufsize=-1, stdout=PIPE).stdout
+	a=Popen("python "+pyw_path+"/"+pyw_filename+" --web --port "+str(webport)+" --wait 3", shell=True, bufsize=-1, stdout=PIPE).stdout
 	a.close()
 	
 
