@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.5"
+pywversion="2.0.6"
 never_update=False
 
 #
@@ -2256,8 +2256,17 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True):
 	addr = public_key_to_bc_address(public_key)
 
 	if verbose:
-		print "Address: %s" % addr
-		print "Privkey: %s" % SecretToASecret(secret, compressed)
+		print "Address (%s): %s"%(aversions[addrtype], addr)
+		print "Privkey (%s): %s"%(aversions[addrtype], SecretToASecret(secret, compressed))
+		print "Hexprivkey: %s"%(secret.encode('hex'))
+		print "Hash160: %s"%(bc_address_to_hash_160(addr).encode('hex'))
+		if compressed:
+			print "Pubkey: 04%.64x%.64x"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
+		else:
+			print "Pubkey: 0%d%.64x"%(2+(pkey.pubkey.point.y()&1), pkey.pubkey.point.x())
+		if int(secret.encode('hex'), 16)>_r:
+			print 'Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r)
+
 
 
 	global crypter, passphrase, json_db
