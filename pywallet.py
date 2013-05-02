@@ -2196,7 +2196,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 			public_key = k['pubkey'].decode('hex')
 			crypter.SetIV(Hash(public_key))
 			secret = crypter.Decrypt(ckey)
-			compressed = public_key[0] != '\04'
+			compressed = public_key[0] != '\x04'
 
 
 			if check:
