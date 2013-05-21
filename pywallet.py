@@ -1086,12 +1086,12 @@ def hash_160(public_key):
 	md.update(hashlib.sha256(public_key).digest())
 	return md.digest()
 
-def public_key_to_bc_address(public_key):
+def public_key_to_bc_address(public_key, v=addrtype):
 	h160 = hash_160(public_key)
-	return hash_160_to_bc_address(h160)
+	return hash_160_to_bc_address(h160, v)
 
-def hash_160_to_bc_address(h160):
-	vh160 = chr(addrtype) + h160
+def hash_160_to_bc_address(h160, v=addrtype):
+	vh160 = chr(v) + h160
 	h = Hash(vh160)
 	addr = vh160 + h[0:4]
 	return b58encode(addr)
@@ -1766,37 +1766,44 @@ def parse_wallet(db, item_callback):
 			print("value data in hex: %s"%value.encode('hex_codec'))
 			sys.exit(1)
 	
-def delete_from_wallet(db_env, walletfile, typedel, keydel):
+def delete_from_wallet(db_env, walletfile, typedel, kd):
 	db = open_wallet(db_env, walletfile, True)
 	kds = BCDataStream()
 	vds = BCDataStream()
 
 	deleted_items = 0
-	for (key, value) in db.items():
-		kds.clear(); kds.write(key)
-		vds.clear(); vds.write(value)
-		type = kds.read_string()
 
-		if typedel == "tx":
-			if type == "tx":
-				if keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')) or keydel == "all":
-					db.delete(key)
-					deleted_items+=1
-		elif typedel == "key":
-			if type == "key" or type == "ckey":
-				if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
-					db.delete(key)
-					deleted_items+=1
-			elif type == "pool":
-				vds.read_int32()
-				vds.read_int64()
-				if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
-					db.delete(key)
-					deleted_items+=1
-			elif type == "name":
-				if keydel == kds.read_string():
-					db.delete(key)
-					deleted_items+=1
+	if not isinstance(kd, list):
+		kd=[kd]
+	print kd
+
+	for i in range(len(kd)):
+		keydel=kd[i]
+		for (key, value) in db.items():
+			kds.clear(); kds.write(key)
+			vds.clear(); vds.write(value)
+			type = kds.read_string()
+
+			if typedel == "tx":
+				if type == "tx":
+					if keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')) or keydel == "all":
+						db.delete(key)
+						deleted_items+=1
+			elif typedel == "key":
+				if type == "key" or type == "ckey":
+					if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
+						db.delete(key)
+						deleted_items+=1
+				elif type == "pool":
+					vds.read_int32()
+					vds.read_int64()
+					if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
+						db.delete(key)
+						deleted_items+=1
+				elif type == "name":
+					if keydel == kds.read_string():
+						db.delete(key)
+						deleted_items+=1
 				
 
 	db.close()
@@ -2182,10 +2189,10 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 	crypted = 'salt' in json_db['mkey']
 
 	if not crypted:
-		print "The wallet is not crypted"
+		print "The wallet is not encrypted"
 
 	if crypted and not passphrase:
-		print "The wallet is crypted but no passphrase is used"
+		print "The wallet is encrypted but no passphrase is used"
 
 	if crypted and passphrase:
 		check = True
@@ -2196,14 +2203,14 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 			public_key = k['pubkey'].decode('hex')
 			crypter.SetIV(Hash(public_key))
 			secret = crypter.Decrypt(ckey)
-			compressed = public_key[0] != '\x04'
+			compressed = public_key[0] != '\04'
 
 
 			if check:
 				check = False
 				pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
 				if public_key != GetPubKey(pkey, compressed):
-					print "The wallet is crypted and the passphrase is incorrect"
+					print "The wallet is encrypted and the passphrase is incorrect"
 					ppcorrect=False
 					break
 
@@ -2218,7 +2225,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 #			del(k['pubkey'])
 			private_keys.append(sec)
 		if ppcorrect:
-			print "The wallet is crypted and the passphrase is correct"
+			print "The wallet is encrypted and the passphrase is correct"
 
 	for k in json_db['keys']:
 		if k['compressed'] and 'secret' in k:
@@ -2233,7 +2240,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 
 
-def importprivkey(db, sec, label, reserve, keyishex, verbose=True):
+def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtype):
 	if keyishex is None:
 		pkey = regenerate_key(sec)
 		compressed = is_compressed(sec)
@@ -2253,14 +2260,14 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True):
 	secret = GetSecret(pkey)
 	private_key = GetPrivKey(pkey, compressed)
 	public_key = GetPubKey(pkey, compressed)
-	addr = public_key_to_bc_address(public_key)
+	addr = public_key_to_bc_address(public_key, addrv)
 
 	if verbose:
-		print "Address (%s): %s"%(aversions[addrtype], addr)
-		print "Privkey (%s): %s"%(aversions[addrtype], SecretToASecret(secret, compressed))
+		print "Address (%s): %s"%(aversions[addrv], addr)
+		print "Privkey (%s): %s"%(aversions[addrv], SecretToASecret(secret, compressed))
 		print "Hexprivkey: %s"%(secret.encode('hex'))
 		print "Hash160: %s"%(bc_address_to_hash_160(addr).encode('hex'))
-		if compressed:
+		if not compressed:
 			print "Pubkey: 04%.64x%.64x"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
 		else:
 			print "Pubkey: 0%d%.64x"%(2+(pkey.pubkey.point.y()&1), pkey.pubkey.point.x())
@@ -2944,14 +2951,18 @@ def import_csv_keys(filename, wdir, wname, nbremax=9999999):
 	  c=content[i]
 	  global_merging_message = ["Merging: "+str(round(100.0*(i+1)/len(content),1))+"%" for j in range(2)]
 	  if ';' in c and len(c)>0 and c[0]!="#":
-		sec,label=c.split(';')
+		cs=c.split(';')
+		sec,label=cs[0:2]
+		v=addrtype
+		if len(cs)>2:
+			v=int(cs[2])
 		reserve=False
 		if label=="#Reserve":
 			reserve=True
-		keyishex=False
+		keyishex=None
 		if abs(len(sec)-65)==1:
 			keyishex=True
-		importprivkey(db, sec, label, reserve, keyishex, verbose=False)
+		importprivkey(db, sec, label, reserve, keyishex, verbose=False, addrv=v)
 
 	global_merging_message = ["Merging done.", ""]
 
@@ -3120,12 +3131,12 @@ if 'twisted' not in missing_dep:
 							WI_ReturnDiv('ImportRODiv') + \
 							WI_FormEnd()
 
-				DeleteForm = WI_FormInit('Delete a key from your wallet:', 'Delete', 'divformdelete') + \
+				DeleteForm = WI_FormInit('Delete keys from your wallet:', 'Delete', 'divformdelete') + \
 							WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
 							WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
-							WI_InputText('Key:', 'key', 'd-key', '', 65) + \
+							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="divided by \'-\'">Keys</span>:', 'key', 'd-key', '', 65) + \
 							"Type:<br />" + \
-							WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Key" to delete them all)') + \
+							WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Keys" to delete them all)') + \
 							WI_RadioButton('d-type', 'key', 'd-r-key', '', ' Bitcoin address') + \
 							WI_Submit('Delete', 'DeleteDiv', 'd-close', 'ajaxDelete') + \
 							WI_CloseButton('DeleteDiv', 'd-close') + \
@@ -3397,7 +3408,7 @@ To support pywallet's development or if you think it's worth something, you can 
 					if not os.path.isfile(wdir+"/"+wname):
 						return '%s/%s doesn\'t exist'%(wdir, wname)
 
-					deleted_items = delete_from_wallet(db_env, wname, typedel, keydel)
+					deleted_items = delete_from_wallet(db_env, wname, typedel, keydel.split('-'))
 
 					return "%s:%s has been successfully deleted from %s/%s, resulting in %d deleted item%s"%(typedel, keydel, wdir, wname, deleted_items, iais(deleted_items))
 
