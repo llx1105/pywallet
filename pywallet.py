@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.6"
+pywversion="2.0.7"
 never_update=False
 
 #
