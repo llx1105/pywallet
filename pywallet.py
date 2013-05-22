@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.7"
+pywversion="2.0.8"
 never_update=False
 
 #
@@ -1775,7 +1775,6 @@ def delete_from_wallet(db_env, walletfile, typedel, kd):
 
 	if not isinstance(kd, list):
 		kd=[kd]
-	print kd
 
 	for i in range(len(kd)):
 		keydel=kd[i]
@@ -3205,7 +3204,7 @@ if 'twisted' not in missing_dep:
 				WI_AjaxFunction('CTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ListTransactions?addresses="+document.getElementById("ctx-adds").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('CPP', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ChangePP?pp="+document.getElementById("cppf-pp").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('DW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('MW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/MergeWallets?dir1="+document.getElementById("mwf-dir1").value+"&name1="+document.getElementById("mwf-name1").value+"&pass1="+document.getElementById("mwf-pass1").value+"&dir2="+document.getElementById("mwf-dir2").value+"&name2="+document.getElementById("mwf-name2").value+"&pass2="+document.getElementById("mwf-pass2").value+"&dirm="+document.getElementById("mwf-dirm").value+"&namem="+document.getElementById("mwf-namem").value+"&passm1="+document.getElementById("mwf-passm1").value+"&passm2="+document.getElementById("mwf-passm2").value+""', 'document.getElementById("retour-pyw").innerHTML = "Merging wallets... This may take a few minutes.";interv1=setInterval(ajaxUpdateMW,300);') + \
+				WI_AjaxFunction('MW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/MergeWallets?dir1="+document.getElementById("mwf-dir1").value+"&name1="+document.getElementById("mwf-name1").value+"&pass1="+encodeURIComponent(document.getElementById("mwf-pass1").value)+"&dir2="+document.getElementById("mwf-dir2").value+"&name2="+document.getElementById("mwf-name2").value+"&pass2="+encodeURIComponent(document.getElementById("mwf-pass2").value)+"&dirm="+document.getElementById("mwf-dirm").value+"&namem="+document.getElementById("mwf-namem").value+"&passm1="+encodeURIComponent(document.getElementById("mwf-passm1").value)+"&passm2="+encodeURIComponent(document.getElementById("mwf-passm2").value)+""', 'document.getElementById("retour-pyw").innerHTML = "Merging wallets... This may take a few minutes.";interv1=setInterval(ajaxUpdateMW,300);') + \
 				WI_AjaxFunction('UpdateMW', 'if(ajaxRequest.responseText.length>0){document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;}else{clearInterval(interv1);}', '"/Others?action=update_mwdiv"', '') + \
 				WI_AjaxFunction('DK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dkf-dir").value+"&filetw="+document.getElementById("dkf-file").value+"&keys="+document.getElementById("dkf-keys").value+"&name="+document.getElementById("dkf-name").value+"&version="+document.getElementById("dkf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('IK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("ikf-dir").value+"&file="+document.getElementById("ikf-file").value+"&name="+document.getElementById("ikf-name").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
@@ -4352,6 +4351,9 @@ if __name__ == '__main__':
 	parser.add_option("--reserve", dest="reserve", action="store_true",
 		help="import as a reserve key, i.e. it won't show in the adress book")
 
+	parser.add_option("--multidelete", dest="multidelete",
+		help="deletes data in your wallet, according to the file provided")
+
 	parser.add_option("--balance", dest="key_balance",
 		help="prints balance of KEY_BALANCE")
 
@@ -4472,7 +4474,6 @@ if __name__ == '__main__':
 	if options.datadir is not None:
 		wallet_name = options.walletfile
 
-
 	if 'twisted' not in missing_dep and options.web is not None:
 		webport = 8989
 		if options.port is not None:
@@ -4491,7 +4492,7 @@ if __name__ == '__main__':
 		print(balance(balance_site, options.key_balance))
 		exit(0)
 
-	if options.dump is None and options.key is None:
+	if options.dump is None and options.key is None and options.multidelete is None:
 		print "A mandatory option is missing\n"
 		parser.print_help()
 		exit(0)
@@ -4518,6 +4519,18 @@ if __name__ == '__main__':
 	db_dir = determine_db_dir()
 
 	db_env = create_env(db_dir)
+
+	if options.multidelete is not None:
+		filename=options.multidelete
+		filin = open(filename, 'r')
+		content = filin.read().split('\n')
+		filin.close()
+		typedel=content[0]
+		kd=filter(bool,content[1:])
+		r=delete_from_wallet(db_env, determine_db_name(), typedel, kd)
+		print '%d element%s deleted'%(r, 's'*(int(r>1)))
+		exit(0)
+
 
 	read_wallet(json_db, db_env, determine_db_name(), True, True, "", options.dumpbalance is not None)
 
