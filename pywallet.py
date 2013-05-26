@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.8"
+pywversion="2.0.9"
 never_update=False
 
 #
@@ -1785,9 +1785,13 @@ def delete_from_wallet(db_env, walletfile, typedel, kd):
 
 			if typedel == "tx":
 				if type == "tx":
-					if keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')) or keydel == "all":
+					if keydel == "all" or keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')):
 						db.delete(key)
 						deleted_items+=1
+						if keydel == "all":
+							continue
+						else:
+							break
 			elif typedel == "key":
 				if type == "key" or type == "ckey":
 					if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
