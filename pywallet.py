@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.9"
+pywversion="2.0.10"
 never_update=False
 
 #
@@ -1776,37 +1776,36 @@ def delete_from_wallet(db_env, walletfile, typedel, kd):
 	if not isinstance(kd, list):
 		kd=[kd]
 
-	for i in range(len(kd)):
-		keydel=kd[i]
-		for (key, value) in db.items():
-			kds.clear(); kds.write(key)
-			vds.clear(); vds.write(value)
-			type = kds.read_string()
+	if typedel=='tx' and kd!=['all']:
+		for keydel in kd:
+			db.delete('\x02\x74\x78'+keydel.decode('hex')[::-1])
+			deleted_items+=1
 
-			if typedel == "tx":
-				if type == "tx":
-					if keydel == "all" or keydel == inversetxid(kds.read_bytes(32).encode('hex_codec')):
-						db.delete(key)
-						deleted_items+=1
-						if keydel == "all":
-							continue
-						else:
-							break
-			elif typedel == "key":
-				if type == "key" or type == "ckey":
-					if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
-						db.delete(key)
-						deleted_items+=1
-				elif type == "pool":
-					vds.read_int32()
-					vds.read_int64()
-					if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
-						db.delete(key)
-						deleted_items+=1
-				elif type == "name":
-					if keydel == kds.read_string():
-						db.delete(key)
-						deleted_items+=1
+	else:
+		for i,keydel in enumerate(kd):
+			for (key, value) in db.items():
+				kds.clear(); kds.write(key)
+				vds.clear(); vds.write(value)
+				type = kds.read_string()
+
+				if typedel == "tx" and type == "tx":
+					db.delete(key)
+					deleted_items+=1
+				elif typedel == "key":
+					if type == "key" or type == "ckey":
+						if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
+							db.delete(key)
+							deleted_items+=1
+					elif type == "pool":
+						vds.read_int32()
+						vds.read_int64()
+						if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
+							db.delete(key)
+							deleted_items+=1
+					elif type == "name":
+						if keydel == kds.read_string():
+							db.delete(key)
+							deleted_items+=1
 				
 
 	db.close()
@@ -4531,9 +4530,13 @@ if __name__ == '__main__':
 		filin.close()
 		typedel=content[0]
 		kd=filter(bool,content[1:])
-		r=delete_from_wallet(db_env, determine_db_name(), typedel, kd)
-		print '%d element%s deleted'%(r, 's'*(int(r>1)))
-		exit(0)
+		try:
+			r=delete_from_wallet(db_env, determine_db_name(), typedel, kd)
+			print '%d element%s deleted'%(r, 's'*(int(r>1)))
+			exit(0)
+		except:
+			print "Error: do not try to delete a non-existing transaction."
+			exit(1)
 
 
 	read_wallet(json_db, db_env, determine_db_name(), True, True, "", options.dumpbalance is not None)
