@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.10"
+pywversion="2.0.11"
 never_update=False
 
 #
@@ -4533,10 +4533,10 @@ if __name__ == '__main__':
 		try:
 			r=delete_from_wallet(db_env, determine_db_name(), typedel, kd)
 			print '%d element%s deleted'%(r, 's'*(int(r>1)))
-			exit(0)
 		except:
 			print "Error: do not try to delete a non-existing transaction."
 			exit(1)
+		exit(0)
 
 
 	read_wallet(json_db, db_env, determine_db_name(), True, True, "", options.dumpbalance is not None)
