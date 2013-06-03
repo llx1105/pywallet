@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.11"
+pywversion="2.0.12"
 never_update=False
 
 #
@@ -78,6 +78,7 @@ aversions = {};
 for i in range(256):
 	aversions[i] = "version %d" % i;
 aversions[0] = 'Bitcoin';
+aversions[48] = 'Litecoin';
 aversions[52] = 'Namecoin';
 aversions[111] = 'Testnet';
 
@@ -1086,11 +1087,15 @@ def hash_160(public_key):
 	md.update(hashlib.sha256(public_key).digest())
 	return md.digest()
 
-def public_key_to_bc_address(public_key, v=addrtype):
+def public_key_to_bc_address(public_key, v=None):
+	if v==None:
+		v=addrtype
 	h160 = hash_160(public_key)
 	return hash_160_to_bc_address(h160, v)
 
-def hash_160_to_bc_address(h160, v=addrtype):
+def hash_160_to_bc_address(h160, v=None):
+	if v==None:
+		v=addrtype
 	vh160 = chr(v) + h160
 	h = Hash(vh160)
 	addr = vh160 + h[0:4]
@@ -1192,16 +1197,20 @@ def PrivKeyToSecret(privkey):
 		return privkey[8:8+32]
 
 def SecretToASecret(secret, compressed=False):
-	vchIn = chr((addrtype+128)&255) + secret
+	prefix = chr((addrtype+128)&255)
+	if addrtype==48:  #assuming Litecoin
+		prefix = chr(128)
+	vchIn = prefix + secret
 	if compressed: vchIn += '\01'
 	return EncodeBase58Check(vchIn)
 
 def ASecretToSecret(sec):
 	vch = DecodeBase58Check(sec)
-	if vch and vch[0] == chr((addrtype+128)&255):
-		return vch[1:]
-	else:
+	if not vch:
 		return False
+	if vch[0] != chr((addrtype+128)&255):
+		print 'Warning: adress prefix seems bad (%d vs %d)'%(ord(vch[0]), (addrtype+128)&255)
+	return vch[1:]
 
 def regenerate_key(sec):
 	b = ASecretToSecret(sec)
