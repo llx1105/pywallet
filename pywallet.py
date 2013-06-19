@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.12"
+pywversion="2.0.13"
 never_update=False
 
 #
@@ -3072,6 +3072,7 @@ if 'twisted' not in missing_dep:
 							WI_FormEnd()
 
 				IKForm = WI_FormInit('Import keys:', 'ImportKeys', 'divformik') + \
+"The CSV file must have the following format: '5PrivateKey;Label'<br />" + \
 							WI_InputText('Wallet Directory: ', 'dir', 'ikf-dir', determine_db_dir()) + \
 							WI_InputText('Wallet Filename: ', 'name', 'ikf-name', determine_db_name(), 20) + \
 							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="Format: \'privkey;label\', label=\'#Reserve\' to make the key a pool one">CSV file path</span>: ', 'file', 'ikf-file', '', 60) + \
