@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.13"
+pywversion="2.0.14"
 never_update=False
 
 #
@@ -4316,10 +4316,6 @@ from optparse import OptionParser
 
 if __name__ == '__main__':
 
-	md5_pywallet = md5_file(pyw_path+"/"+pyw_filename)
-	thread.start_new_thread(retrieve_last_pywallet_md5, ())
-
-
 	
 	parser = OptionParser(usage="%prog [options]", version="%prog 1.1")
 
@@ -4488,6 +4484,9 @@ if __name__ == '__main__':
 		wallet_name = options.walletfile
 
 	if 'twisted' not in missing_dep and options.web is not None:
+		md5_pywallet = md5_file(pyw_path+"/"+pyw_filename)
+		thread.start_new_thread(retrieve_last_pywallet_md5, ())
+
 		webport = 8989
 		if options.port is not None:
 			webport = int(options.port)
