@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.14"
+pywversion="2.0.15"
 never_update=False
 
 #
@@ -3167,7 +3167,9 @@ if 'twisted' not in missing_dep:
 
 				BalanceForm = WI_FormInit('Print the balance of a Bitcoin address:', 'Balance', 'divformbalance') + \
 							WI_InputText('Key:', 'key', 'bf-key', '', 35) + \
-							'<input type=submit value="Get balance" onClick="ajaxBalance();return false;" /><div id="BalanceDiv"></div>' + \
+							WI_Submit('Get balance', 'BalanceDiv', 'gb-close', 'ajaxBalance') + \
+							WI_CloseButton('BalanceDiv', 'gb-close') + \
+							WI_ReturnDiv('BalanceDiv') + \
 							WI_FormEnd()
 							
 				global CTX_adds, addr_to_keys
@@ -3225,7 +3227,7 @@ if 'twisted' not in missing_dep:
 				WI_AjaxFunction('Info', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Import', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&com="+document.getElementById("impf-com").checked+"&cry="+document.getElementById("impf-cry").checked+"&format="+document.getElementById("impf-hex").checked+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('ImportRO', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("irof-dir").value+"&name="+document.getElementById("irof-name").value+"&pub="+document.getElementById("irof-pub").value+"&label="+document.getElementById("irof-label").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balancekey="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Delete', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('ImportTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				'</script>'
