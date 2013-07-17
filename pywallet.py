@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.15"
+pywversion="2.0.16"
 never_update=False
 
 #
@@ -2288,7 +2288,9 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtyp
 
 
 	global crypter, passphrase, json_db
-	crypted = 'salt' in json_db['mkey']
+	crypted = False
+	if 'mkey' in json_db.keys() and 'salt' in json_db['mkey']:
+		crypted = True
 	if crypted:
 		if passphrase:
 			cry_master = json_db['mkey']['encrypted_key'].decode('hex')
