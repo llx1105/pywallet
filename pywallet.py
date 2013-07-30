@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.0.16"
+pywversion="2.1.0"
 never_update=False
 
 #
@@ -21,7 +21,7 @@ try:
 except:
 	missing_dep.append('bsddb')
 
-import os, sys, time
+import os, sys, time, re
 pyw_filename = os.path.basename(__file__)
 pyw_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -64,6 +64,9 @@ except:
 from datetime import datetime
 from subprocess import *
 
+import os
+import os.path
+import platform
 
 max_version = 81000
 addrtype = 0
@@ -103,10 +106,14 @@ def iais(a):
 	else:
 		return ''
 
+def systype():
+	if platform.system() == "Darwin":
+		return 'Mac'
+	elif platform.system() == "Windows":
+		return 'Win'
+	return 'Linux'
+		
 def determine_db_dir():
-	import os
-	import os.path
-	import platform
 	if wallet_dir in "":
 		if platform.system() == "Darwin":
 			return os.path.expanduser("~/Library/Application Support/Bitcoin/")
@@ -823,10 +830,13 @@ class Crypter_pure(object):
 
 if crypter == 'pycrypto':
 	crypter = Crypter_pycrypto()
+#	print "Crypter: pycrypto"
 elif crypter == 'ssl':
 	crypter = Crypter_ssl()
+#	print "Crypter: ssl"
 else:
 	crypter = Crypter_pure()
+#	print "Crypter: pure"
 	logging.warning("pycrypto or libssl not found, decryption may be slow")
 
 ##########################################
@@ -835,7 +845,11 @@ else:
 
 # secp256k1
 
-_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+try:
+	_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+except:
+	print "Python 3 is not supported, you need Python 2.7.x"
+	exit(1)
 _r = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141L
 _b = 0x0000000000000000000000000000000000000000000000000000000000000007L
 _a = 0x0000000000000000000000000000000000000000000000000000000000000000L
@@ -1281,6 +1295,327 @@ def parse_setting(setting, vds):
 
 class SerializationError(Exception):
 	""" Thrown when there's a problem deserializing or serializing """
+
+
+def search_patterns_on_disk(device, size, inc, patternlist):   # inc must be higher than 1k
+	try:
+		otype=os.O_RDONLY|os.O_BINARY
+	except:
+		otype=os.O_RDONLY
+	try:
+		fd = os.open(device, otype)
+	except Exception as e:
+		print "Can't open %s, check the path or try as root"%device
+		print "  Error:", e.args
+		exit(0)
+
+	i = 0
+	data=''
+
+	tzero=time.time()
+	sizetokeep=0
+	BlocksToInspect=dict(map(lambda x:[x,[]], patternlist))
+	syst=systype()
+	lendataloaded=None
+	writeProgressEvery=100*Mo
+	while i < int(size) and (lendataloaded!=0 or lendataloaded==None):
+		if int(i/writeProgressEvery)!=int((i+inc)/writeProgressEvery):
+			print "%.2f Go read"%(i/1e9)
+		try:
+			datakept=data[-sizetokeep:]
+			data = datakept+os.read(fd, inc)
+			lendataloaded = len(data)-len(datakept)   #should be inc
+			for text in patternlist:
+				if text in data:
+					BlocksToInspect[text].append([i-len(datakept), data, len(datakept)])
+					pass
+			sizetokeep=20   # 20 because all the patterns have a len<20. Could be higher.
+			i += lendataloaded
+		except Exception as exc:
+			if lendataloaded%512>0:
+				raise Exception("SPOD error 1: %d, %d"%(lendataloaded, i-len(datakept)))
+			os.lseek(fd, lendataloaded, os.SEEK_CUR)
+			print str(exc)
+			i += lendataloaded
+			continue
+	os.close(fd)
+
+	AllOffsets=dict(map(lambda x:[x,[]], patternlist))
+	for text,blocks in BlocksToInspect.items():
+		for offset,data,ldk in blocks:  #ldk = len(datakept)
+			offsetslist=[offset+m.start() for m in re.finditer(text, data)]
+			AllOffsets[text].extend(offsetslist)
+
+	AllOffsets['PRFdevice']=device
+	AllOffsets['PRFdt']=time.time()-tzero
+	AllOffsets['PRFsize']=i
+	return AllOffsets
+
+def multiextract(s, ll):
+	r=[]
+	cursor=0
+	for length in ll:
+		r.append(s[cursor:cursor+length])
+		cursor+=length
+	if s[cursor:]!='':
+		r.append(s[cursor:])
+	return r
+
+class RecovCkey(object):
+	def __init__(self, epk, pk):
+		self.encrypted_pk=epk
+		self.public_key=pk
+		self.mkey=None
+		self.privkey=None
+
+
+class RecovMkey(object):
+	def __init__(self, ekey, salt, nditer, ndmethod, nid):
+		self.encrypted_key=ekey
+		self.salt=salt
+		self.iterations=nditer
+		self.method=ndmethod
+		self.id=nid
+
+def readpartfile(fd, offset, length):   #make everything 512*n because of windows...
+	rest=offset%512
+	new_offset=offset-rest
+	big_length=512*(int((length+rest-1)/512)+1)
+	os.lseek(fd, new_offset, os.SEEK_SET)
+	d=os.read(fd, big_length)
+	return d[rest:rest+length]
+	
+def recov_ckey(fd, offset):
+	d=readpartfile(fd, offset-49, 122)
+	me=multiextract(d, [1,48,4,4,1])
+
+	checks=[]
+	checks.append([0, '30'])
+	checks.append([3, '636b6579'])
+	if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
+		return None
+
+	return me
+
+def recov_mkey(fd, offset):
+	d=readpartfile(fd, offset-72, 84)
+	me=multiextract(d, [4,48,1,8,4,4,1,2,8,4])
+
+	checks=[]
+	checks.append([0, '43000130'])
+	checks.append([2, '08'])
+	checks.append([6, '00'])
+	checks.append([8, '090001046d6b6579'])
+	if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
+		return None
+
+	return me
+
+def recov_uckey(fd, offset):
+	checks=[]
+
+	d=readpartfile(fd, offset-217, 223)
+	if d[-7]=='\x26':
+		me=multiextract(d, [2,1,4,1,32,141,33,2,1,6])
+
+		checks.append([0, '3081'])
+		checks.append([2, '02010104'])
+	elif d[-7]=='\x46':
+		d=readpartfile(fd, offset-282, 286)
+		
+		me=multiextract(d, [2,1,4,1,32,173,65,1,2,5])
+
+		checks.append([0, '8201'])
+		checks.append([2, '02010104'])
+		checks.append([-1, '460001036b'])
+	else:
+		return None
+
+
+	if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
+		return None
+
+	return me
+
+def starts_with(s, b):
+	return len(s)>=len(b) and s[:len(b)]==b
+	
+
+def recov(device, passes, size=102400, inc=10240, outputdir='.'):
+	if inc%512>0:
+		inc-=inc%512   #inc must be 512*n on Windows... Don't ask me why...
+		
+	nameToDBName={'mkey':'\x09\x00\x01\x04mkey','ckey':'\x27\x00\x01\x04ckey','key':'\x00\x01\x03key',}
+
+	
+	if not starts_with(device, 'PartialRecoveryFile:'):
+		r=search_patterns_on_disk(device, size, inc, map(lambda x:nameToDBName[x], ['mkey', 'ckey', 'key']))
+		f=open(outputdir+'/pywallet_partial_recovery_%d.dat'%ts(), 'w')
+		f.write(str(r))
+		f.close()
+		print "\nRead %.1f Go in %.1f minutes\n"%(r['PRFsize']/1e9, r['PRFdt']/60.0)
+	else:
+		prf=device[20:]
+		f=open(prf, 'r')
+		content=f.read()
+		f.close()
+		cmd=("z = "+content+"")
+		exec cmd in locals()
+		r=z
+		device=r['PRFdevice']
+		print "\nLoaded %.1f Go from %s\n"%(r['PRFsize']/1e9, device)
+
+
+	try:
+		otype=os.O_RDONLY|os.O_BINARY
+	except:
+		otype=os.O_RDONLY
+	fd = os.open(device, otype)
+	
+
+	mkeys=[]
+	crypters=[]
+	syst=systype()
+	for offset in r[nameToDBName['mkey']]:
+		s=recov_mkey(fd, offset)
+		if s==None:
+			continue
+		newmkey=RecovMkey(s[1],s[3],int(s[5][::-1].encode('hex'), 16),int(s[4][::-1].encode('hex'), 16),int(s[-1][::-1].encode('hex'), 16))
+		mkeys.append([offset,newmkey])
+
+	print "Found", len(mkeys), 'possible wallets'
+
+
+
+
+	ckeys=[]
+	for offset in r[nameToDBName['ckey']]:
+		s=recov_ckey(fd, offset)
+		if s==None:
+			continue
+		newckey=RecovCkey(s[1], s[5][:int(s[4].encode('hex'),16)])
+		ckeys.append([offset,newckey])
+	print "Found", len(ckeys), 'possible encrypted keys'
+
+
+	uckeys=[]
+	for offset in r[nameToDBName['key']]:
+		s=recov_uckey(fd, offset)
+		if s==None:
+			continue
+		uckeys.append(s[4])
+	print "Found", len(uckeys), 'possible unencrypted keys'
+
+	
+	os.close(fd)
+	
+	
+	list_of_possible_keys_per_master_key=dict(map(lambda x:[x[1],[]], mkeys))
+	for cko,ck in ckeys:
+		tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
+		tl=sorted(tl, key=lambda x:x[0])
+		list_of_possible_keys_per_master_key[tl[0][2]].append(ck)
+
+	cpt=0
+	mki=1
+	tzero=time.time()
+	if len(passes)==0:
+		if len(ckeys)>0:
+			print "Can't decrypt them as you didn't provide any passphrase."
+	else:
+		for mko,mk in mkeys:
+			list_of_possible_keys=list_of_possible_keys_per_master_key[mk]
+			sys.stdout.write( "\nPossible wallet #"+str(mki))
+			sys.stdout.flush()
+			for ppi,pp in enumerate(passes):
+				sys.stdout.write( "\n    with passphrase #"+str(ppi+1)+"  ")
+				sys.stdout.flush()
+				failures_in_a_row=0
+#				print "SKFP params:", pp, mk.salt, mk.iterations, mk.method
+				res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
+				if res == 0:
+					print "Unsupported derivation method"
+					sys.exit(1)
+				masterkey = crypter.Decrypt(mk.encrypted_key)
+				crypter.SetKey(masterkey)
+				for ck in list_of_possible_keys:
+					if cpt%10==9 and failures_in_a_row==0:
+						sys.stdout.write('.')
+						sys.stdout.flush()
+					if failures_in_a_row>5:
+						break
+					crypter.SetIV(Hash(ck.public_key))
+					secret = crypter.Decrypt(ck.encrypted_pk)
+					compressed = ck.public_key[0] != '\04'
+
+
+					pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
+					if ck.public_key != GetPubKey(pkey, compressed):
+						failures_in_a_row+=1
+					else:
+						failures_in_a_row=0
+						ck.mkey=mk
+						ck.privkey=secret
+					cpt+=1
+			mki+=1
+		print "\n"
+		tone=time.time()
+		calcspeed=1.0*cpt/(tone-tzero)*60  #calc/min
+
+		ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
+		refused_to_test_all_pps=True
+		if len(ckeys_not_decrypted)==0:
+			print "All the found encrypted private keys have been decrypted."
+			return map(lambda x:x[1].privkey, ckeys)
+		else:
+			print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
+			print "Trying all the remaining possibilities (%d) might take up to %d minutes."%(len(ckeys_not_decrypted)*len(passes)*len(mkeys),int(len(ckeys_not_decrypted)*len(passes)*len(mkeys)/calcspeed))
+			cont=raw_input("Do you want to test them? (y/n): ")
+			while len(cont)==0:
+                                cont=raw_input("Do you want to test them? (y/n): ")
+                        if cont[0]=='y':
+                                refused_to_test_all_pps=False
+                                cpt=0
+                                for dist,mko,mk in tl:
+                                        for ppi,pp in enumerate(passes):
+                                                res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
+                                                if res == 0:
+                                                        logging.error("Unsupported derivation method")
+                                                        sys.exit(1)
+                                                masterkey = crypter.Decrypt(mk.encrypted_key)
+                                                crypter.SetKey(masterkey)
+                                                for cko,ck in ckeys_not_decrypted:
+                                                        tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
+                                                        tl=sorted(tl, key=lambda x:x[0])
+                                                        if mk==tl[0][2]:
+                                                                continue         #because already tested
+                                                        crypter.SetIV(Hash(ck.public_key))
+                                                        secret = crypter.Decrypt(ck.encrypted_pk)
+                                                        compressed = ck.public_key[0] != '\04'
+
+
+                                                        pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
+                                                        if ck.public_key == GetPubKey(pkey, compressed):
+                                                                ck.mkey=mk
+                                                                ck.privkey=secret
+                                                        cpt+=1
+
+		print
+		ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
+		if len(ckeys_not_decrypted)==0:
+			print "All the found encrypted private keys have been finally decrypted."
+		elif not refused_to_test_all_pps:
+			print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
+			print "Try another password, check the size of your partition or seek help"
+	
+
+	uncrypted_ckeys=filter(lambda x:x!=None, map(lambda x:x[1].privkey, ckeys))
+	uckeys.extend(uncrypted_ckeys)
+	
+	return uckeys
+
+	
+
 
 def ts():
 	return int(time.mktime(datetime.now().timetuple()))
@@ -1906,7 +2241,7 @@ def merge_wallets(wadir, wa, wbdir, wb, wrdir, wr, passphrase_a, passphrase_b, p
 			'nID' : 1,
 			'otherParams' : ''.decode('hex'),
 		    "salt": NPP_salt
-		}) 
+		})
 
 
 	dbr.close()
@@ -1931,7 +2266,7 @@ def random_string(l, alph="0123456789abcdef"):
 		r+=alph[int(la*(random.random()))]
 	return r
 
-def update_wallet(db, type, data):
+def update_wallet(db, types, datas, paramsAreLists=False):
 	"""Write a single item to the wallet.
 	db must be open with writable=True.
 	type and data are the type code and data dictionary as parse_wallet would
@@ -1939,84 +2274,95 @@ def update_wallet(db, type, data):
 	data's __key__, __value__ and __type__ are ignored; only the primary data
 	fields are used.
 	"""
-	d = data
-	kds = BCDataStream()
-	vds = BCDataStream()
+	
+	if not paramsAreLists:
+		types=[types]
+		datas=[datas]
+		
+	if len(types)!=len(datas):
+		raise Exception("UpdateWallet: sizes are different")
 
-	# Write the type code to the key
-	kds.write_string(type)
-	vds.write("")						 # Ensure there is something
+	for it,type in enumerate(types):
+		data=datas[it]
+		
+		d = data
+		kds = BCDataStream()
+		vds = BCDataStream()
 
-	try:
-		if type == "tx":
-#			raise NotImplementedError("Writing items of type 'tx'")
-			kds.write(d['txi'][6:].decode('hex_codec'))
-			vds.write(d['txv'].decode('hex_codec'))
-		elif type == "name":
-			kds.write_string(d['hash'])
-			vds.write_string(d['name'])
-		elif type == "version":
-			vds.write_uint32(d['version'])
-		elif type == "minversion":
-			vds.write_uint32(d['minversion'])
-		elif type == "setting":
-			raise NotImplementedError("Writing items of type 'setting'")
-			kds.write_string(d['setting'])
-			#d['value'] = parse_setting(d['setting'], vds)
-		elif type == "key":
-			kds.write_string(d['public_key'])
-			vds.write_string(d['private_key'])
-		elif type == "wkey":
-			kds.write_string(d['public_key'])
-			vds.write_string(d['private_key'])
-			vds.write_int64(d['created'])
-			vds.write_int64(d['expires'])
-			vds.write_string(d['comment'])
-		elif type == "defaultkey":
-			vds.write_string(d['key'])
-		elif type == "pool":
-			kds.write_int64(d['n'])
-			vds.write_int32(d['nVersion'])
-			vds.write_int64(d['nTime'])
-			vds.write_string(d['public_key'])
-		elif type == "acc":
-			kds.write_string(d['account'])
-			vds.write_int32(d['nVersion'])
-			vds.write_string(d['public_key'])
-		elif type == "acentry":
-			kds.write_string(d['account'])
-			kds.write_uint64(d['n'])
-			vds.write_int32(d['nVersion'])
-			vds.write_int64(d['nCreditDebit'])
-			vds.write_int64(d['nTime'])
-			vds.write_string(d['otherAccount'])
-			vds.write_string(d['comment'])
-		elif type == "bestblock":
-			vds.write_int32(d['nVersion'])
-			vds.write_compact_size(len(d['hashes']))
-			for h in d['hashes']:
-				vds.write(h)
-		elif type == "ckey":
-			kds.write_string(d['public_key'])
-			vds.write_string(d['encrypted_private_key'])
-		elif type == "mkey":
-			kds.write_uint32(d['nID'])
-			vds.write_string(d['encrypted_key'])
-			vds.write_string(d['salt'])
-			vds.write_uint32(d['nDerivationMethod'])
-			vds.write_uint32(d['nDerivationIterations'])
-			vds.write_string(d['otherParams'])
+		# Write the type code to the key
+		kds.write_string(type)
+		vds.write("")						 # Ensure there is something
 
-		else:
-			print "Unknown key type: "+type
+		try:
+			if type == "tx":
+	#			raise NotImplementedError("Writing items of type 'tx'")
+				kds.write(d['txi'][6:].decode('hex_codec'))
+				vds.write(d['txv'].decode('hex_codec'))
+			elif type == "name":
+				kds.write_string(d['hash'])
+				vds.write_string(d['name'])
+			elif type == "version":
+				vds.write_uint32(d['version'])
+			elif type == "minversion":
+				vds.write_uint32(d['minversion'])
+			elif type == "setting":
+				raise NotImplementedError("Writing items of type 'setting'")
+				kds.write_string(d['setting'])
+				#d['value'] = parse_setting(d['setting'], vds)
+			elif type == "key":
+				kds.write_string(d['public_key'])
+				vds.write_string(d['private_key'])
+			elif type == "wkey":
+				kds.write_string(d['public_key'])
+				vds.write_string(d['private_key'])
+				vds.write_int64(d['created'])
+				vds.write_int64(d['expires'])
+				vds.write_string(d['comment'])
+			elif type == "defaultkey":
+				vds.write_string(d['key'])
+			elif type == "pool":
+				kds.write_int64(d['n'])
+				vds.write_int32(d['nVersion'])
+				vds.write_int64(d['nTime'])
+				vds.write_string(d['public_key'])
+			elif type == "acc":
+				kds.write_string(d['account'])
+				vds.write_int32(d['nVersion'])
+				vds.write_string(d['public_key'])
+			elif type == "acentry":
+				kds.write_string(d['account'])
+				kds.write_uint64(d['n'])
+				vds.write_int32(d['nVersion'])
+				vds.write_int64(d['nCreditDebit'])
+				vds.write_int64(d['nTime'])
+				vds.write_string(d['otherAccount'])
+				vds.write_string(d['comment'])
+			elif type == "bestblock":
+				vds.write_int32(d['nVersion'])
+				vds.write_compact_size(len(d['hashes']))
+				for h in d['hashes']:
+					vds.write(h)
+			elif type == "ckey":
+				kds.write_string(d['public_key'])
+				vds.write_string(d['encrypted_private_key'])
+			elif type == "mkey":
+				kds.write_uint32(d['nID'])
+				vds.write_string(d['encrypted_key'])
+				vds.write_string(d['salt'])
+				vds.write_uint32(d['nDerivationMethod'])
+				vds.write_uint32(d['nDerivationIterations'])
+				vds.write_string(d['otherParams'])
 
-		# Write the key/value pair to the database
-		db.put(kds.input, vds.input)
+			else:
+				print "Unknown key type: "+type
 
-	except Exception, e:
-		print("ERROR writing to wallet.dat, type %s"%type)
-		print("data dictionary: %r"%data)
-		traceback.print_exc()
+			# Write the key/value pair to the database
+			db.put(kds.input, vds.input)
+
+		except Exception, e:
+			print("ERROR writing to wallet.dat, type %s"%type)
+			print("data dictionary: %r"%data)
+			traceback.print_exc()
 
 def create_new_wallet(db_env, walletfile, version):
 	db_out = DB(db_env)
@@ -2106,7 +2452,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 			addr = public_key_to_bc_address(d['public_key'])
 			compressed = d['public_key'][0] != '\04'
 			sec = SecretToASecret(PrivKeyToSecret(d['private_key']), compressed)
-			hexsec = ASecretToSecret(sec).encode('hex')
+			hexsec = ASecretToSecret(sec).encode('hex')[:32]
 			private_keys.append(sec)
 			addr_to_keys[addr]=[hexsec, d['public_key'].encode('hex')]
 			json_db['keys'].append({'addr' : addr, 'sec' : sec, 'hexsec' : hexsec, 'secret' : hexsec, 'pubkey':d['public_key'].encode('hex'), 'compressed':compressed, 'private':d['private_key'].encode('hex')})
@@ -2227,7 +2573,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 
 			sec = SecretToASecret(secret, compressed)
 			k['sec'] = sec
-			k['hexsec'] = sec
+			k['hexsec'] = secret[:32].encode('hex')
 			k['secret'] = secret.encode('hex')
 			k['compressed'] = compressed
 			addr_to_keys[k['addr']]=[sec, k['pubkey']]
@@ -2363,6 +2709,7 @@ def keyinfo(sec, keyishex):
 	print "Address (%s): %s" % ( aversions[addrtype], addr )
 	print "Privkey (%s): %s" % ( aversions[addrtype], SecretToASecret(secret, compressed) )
 	print "Hexprivkey:   %s" % secret.encode('hex')
+	print "Hash160:      %s"%(bc_address_to_hash_160(addr).encode('hex'))
 
 	return True
 
@@ -4306,9 +4653,56 @@ def restart_pywallet():
 def start_pywallet():
 	a=Popen("python "+pyw_path+"/"+pyw_filename+" --web --port "+str(webport)+" --wait 3", shell=True, bufsize=-1, stdout=PIPE).stdout
 	a.close()
+
+def clone_wallet(parentPath, clonePath):
+	types,datas=[],[]
+	parentdir,parentname=os.path.split(parentPath)
+	wdir,wname=os.path.split(clonePath)
+
+	db_env = create_env(parentdir)
+	read_wallet(json_db, db_env, parentname, True, True, "", False)
+
+	types.append('version')
+	datas.append({'version':json_db['version']})
+	types.append('defaultkey')
+	datas.append({'key':json_db['defaultkey']})
+	for k in json_db['keys']:
+		types.append('ckey')
+		datas.append({'public_key':k['pubkey'].decode('hex'),'encrypted_private_key':random_string(96).decode('hex')})
+	for k in json_db['pool']:
+		types.append('pool')
+		datas.append({'n':k['n'],'nVersion':k['nVersion'],'nTime':k['nTime'],'public_key':k['public_key_hex'].decode('hex')})
+	for addr,label in json_db['names'].items():
+		types.append('name')
+		datas.append({'hash':addr,'name':'Watch:'+label})
+
+	db_env = create_env(wdir)
+	create_new_wallet(db_env, wname, 60000)
+
+	db = open_wallet(db_env, wname, True)
+	NPP_salt=random_string(16).decode('hex')
+	NPP_rounds=int(50000+random.random()*20000)
+	NPP_method=0
+	NPP_MK=random_string(64).decode('hex')
+	crypter.SetKeyFromPassphrase(random_string(64), NPP_salt, NPP_rounds, NPP_method)
+	NPP_EMK = crypter.Encrypt(NPP_MK)
+	update_wallet(db, 'mkey', {
+		"encrypted_key": NPP_EMK,
+		'nDerivationIterations' : NPP_rounds,
+		'nDerivationMethod' : NPP_method,
+		'nID' : 1,
+		'otherParams' : ''.decode('hex'),
+		"salt": NPP_salt
+	})
+	db.close()
+
+	read_wallet(json_db, db_env, wname, True, True, "", False)
+
+	db = open_wallet(db_env, wname, writable=True)
+	update_wallet(db, types, datas, True)
+	db.close()
+	print "Wallet successfully cloned to:\n   %s"%clonePath
 	
-
-
 import thread
 md5_last_pywallet = [False, ""]
 
@@ -4380,13 +4774,19 @@ if __name__ == '__main__':
 		help="recover your deleted keys, use with recov_size and recov_device")
 
 	parser.add_option("--recov_device", dest="recov_device",
-		help="device to read (e.g. /dev/sda1)")
+		help="device to read (e.g. /dev/sda1 or E: or a file)")
 
 	parser.add_option("--recov_size", dest="recov_size",
 		help="number of bytes to read (e.g. 20Mo or 50Gio)")
 
 	parser.add_option("--recov_outputdir", dest="recov_outputdir",
 		help="output directory where the recovered wallet will be put")
+
+	parser.add_option("--clone_watchonly_from", dest="clone_watchonly_from",
+		help="path of the original wallet")
+
+	parser.add_option("--clone_watchonly_to", dest="clone_watchonly_to",
+		help="path of the resulting watch-only wallet")
 
 	parser.add_option("--dont_check_walletversion", dest="dcv", action="store_true",
 		help="don't check if wallet version > %d before running (WARNING: this may break your wallet, be sure you know what you do)"%max_version)
@@ -4415,34 +4815,81 @@ if __name__ == '__main__':
 
 	if options.passphrase:
 		passphrase = options.passphrase
+		
+	if options.clone_watchonly_from is not None and options.clone_watchonly_to:
+		clone_wallet(options.clone_watchonly_from, options.clone_watchonly_to)
+		exit(0)
+
 
 	if options.recover:
 		if options.recov_size is None or options.recov_device is None or options.recov_outputdir is None:
 			print("You must provide the device, the number of bytes to read and the output directory")
 			exit(0)
 		device = options.recov_device
+		if len(device) in [2,3] and device[1]==':':
+			device="\\\\.\\"+device
 		size = read_device_size(options.recov_size)
-		r = first_read(device, size, prekeys, 10000)
-		r = shrink_intervals(device, r, prekeys, 1000)
-		[to_read, o] = find_offsets(device, r, prekeys)
-		print("%dko to read"%(to_read/1000))
-		keys = read_keys(device, o)
-		print("%d key%s found"%(len(keys), iais(len(keys))))
+
+		passphraseRecov=''
+		while passphraseRecov=='':
+			passphraseRecov=raw_input("Enter the passphrase for the wallet that will contain all the recovered keys: ")
+		passphrase=passphraseRecov
+
+		passes=[]
+		p=' '
+		print '\nEnter the possible passphrases used in your deleted wallets.'
+		print "Don't forget that more passphrases = more time to test the possibilities."
+		print 'Write one passphrase per line and end with an empty line.'
+		while p!='':
+			p=raw_input("Possible passphrase: ")
+			if p!='':
+				passes.append(p)
+
+		print "\nStarting recovery."
+		recoveredKeys=recov(device, passes, size, 10240, options.recov_outputdir)
+		recoveredKeys=list(set(recoveredKeys))
+#		print recoveredKeys[0:5]
+
 
 		db_env = create_env(options.recov_outputdir)
 		recov_wallet_name = "recovered_wallet_%s.dat"%ts()
-		create_new_wallet(db_env, recov_wallet_name, 32500)
 
+		create_new_wallet(db_env, recov_wallet_name, 32500)
+		
+		if passphraseRecov!="I don't want to put a password on the recovered wallet and I know what can be the consequences.":
+			db = open_wallet(db_env, recov_wallet_name, True)
+
+			NPP_salt=random_string(16).decode('hex')
+			NPP_rounds=int(50000+random.random()*20000)
+			NPP_method=0
+			NPP_MK=random_string(64).decode('hex')
+			crypter.SetKeyFromPassphrase(passphraseRecov, NPP_salt, NPP_rounds, NPP_method)
+			NPP_EMK = crypter.Encrypt(NPP_MK)
+			update_wallet(db, 'mkey', {
+				"encrypted_key": NPP_EMK,
+				'nDerivationIterations' : NPP_rounds,
+				'nDerivationMethod' : NPP_method,
+				'nID' : 1,
+				'otherParams' : ''.decode('hex'),
+				"salt": NPP_salt
+			})
+			db.close()
+		
+		read_wallet(json_db, db_env, recov_wallet_name, True, True, "", False)
+		
 		db = open_wallet(db_env, recov_wallet_name, True)
+
 		i = 0
-		for sec in keys:
-			print("\nImporting key %4d/%d:"%(i+1, len(keys)))
+		print "\n\nImporting:"
+		for sec in recoveredKeys:
+			sec=sec.encode('hex')
+			print("\nKey %4d/%d imported:"%(i+1, len(recoveredKeys)))
 			importprivkey(db, sec, "recovered: %s"%sec, None, True)
 			i += 1
 		db.close()
 
-		print("\n\nThe new wallet %s/%s contains the %d recovered key%s\n"%(options.recov_outputdir, recov_wallet_name, len(keys), iais(len(keys))))
-
+		print("\n\nThe new wallet %s/%s contains the %d recovered key%s"%(options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
+		
 		exit(0)
 
 
