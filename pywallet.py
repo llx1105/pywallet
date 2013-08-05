@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.0"
+pywversion="2.1.1"
 never_update=False
 
 #
@@ -1560,7 +1560,12 @@ def recov(device, passes, size=102400, inc=10240, outputdir='.'):
 			mki+=1
 		print "\n"
 		tone=time.time()
-		calcspeed=1.0*cpt/(tone-tzero)*60  #calc/min
+		try:
+			calcspeed=1.0*cpt/(tone-tzero)*60  #calc/min
+		except:
+			calcspeed=1.0
+		if calcspeed==0:
+			calcspeed=1.0
 
 		ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
 		refused_to_test_all_pps=True
