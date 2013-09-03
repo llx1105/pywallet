@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.1"
+pywversion="2.1.2"
 never_update=False
 
 #
@@ -4936,7 +4936,7 @@ if __name__ == '__main__':
 	if options.datadir is not None:
 		wallet_dir = options.datadir
 
-	if options.datadir is not None:
+	if options.walletfile is not None:
 		wallet_name = options.walletfile
 
 	if 'twisted' not in missing_dep and options.web is not None:
