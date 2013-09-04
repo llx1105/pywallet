@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.2"
+pywversion="2.1.3"
 never_update=False
 
 #
@@ -3393,6 +3393,7 @@ if 'twisted' not in missing_dep:
 							WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
 							WI_InputText('Wallet Filename: ', 'name', 'dwf-name', determine_db_name(), 20) + \
 							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
+							WI_Checkbox('bal', 'y', 'dwf-bal', '', ' Dump with balance (can take minutes)') + "<br />" + \
 							WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
 							WI_CloseButton('DWDiv', 'dwf-close') + \
 							WI_ReturnDiv('DWDiv') + \
@@ -3420,6 +3421,7 @@ if 'twisted' not in missing_dep:
 							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dkf-vers', '0', 1) + \
 							WI_InputText('Output file: ', 'file', 'dkf-file', '', 60) + \
 							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="to be chosen from the ones in wallet dump, separated with \',\', e.g. \'addr,secret\'">Data to print: </span>', 'keys', 'dkf-keys', '') + \
+							WI_Checkbox('bal', 'y', 'dkf-bal', '', ' Dump with balance (can take minutes)') + "<br />" + \
 							WI_Submit('Dump keys', 'DKDiv', 'dkf-close', 'ajaxDK') + \
 							WI_CloseButton('DKDiv', 'dkf-close') + \
 							WI_ReturnDiv('DKDiv') + \
@@ -3572,10 +3574,10 @@ if 'twisted' not in missing_dep:
 				WI_AjaxFunction('UpdatePyw', 'document.getElementById("uptodate").innerHTML = ajaxRequest.responseText;setTimeout(function() {window.location.reload();}, 2000);', '"/?update=1"', 'document.getElementById("uptodate").innerHTML = "Updating...";') + \
 				WI_AjaxFunction('CTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ListTransactions?addresses="+document.getElementById("ctx-adds").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('CPP', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ChangePP?pp="+document.getElementById("cppf-pp").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('DW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('DW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&bal="+document.getElementById("dwf-bal").checked+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('MW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/MergeWallets?dir1="+document.getElementById("mwf-dir1").value+"&name1="+document.getElementById("mwf-name1").value+"&pass1="+encodeURIComponent(document.getElementById("mwf-pass1").value)+"&dir2="+document.getElementById("mwf-dir2").value+"&name2="+document.getElementById("mwf-name2").value+"&pass2="+encodeURIComponent(document.getElementById("mwf-pass2").value)+"&dirm="+document.getElementById("mwf-dirm").value+"&namem="+document.getElementById("mwf-namem").value+"&passm1="+encodeURIComponent(document.getElementById("mwf-passm1").value)+"&passm2="+encodeURIComponent(document.getElementById("mwf-passm2").value)+""', 'document.getElementById("retour-pyw").innerHTML = "Merging wallets... This may take a few minutes.";interv1=setInterval(ajaxUpdateMW,300);') + \
 				WI_AjaxFunction('UpdateMW', 'if(ajaxRequest.responseText.length>0){document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;}else{clearInterval(interv1);}', '"/Others?action=update_mwdiv"', '') + \
-				WI_AjaxFunction('DK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dkf-dir").value+"&filetw="+document.getElementById("dkf-file").value+"&keys="+document.getElementById("dkf-keys").value+"&name="+document.getElementById("dkf-name").value+"&version="+document.getElementById("dkf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+				WI_AjaxFunction('DK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dkf-dir").value+"&filetw="+document.getElementById("dkf-file").value+"&keys="+document.getElementById("dkf-keys").value+"&bal="+document.getElementById("dkf-bal").checked+"&name="+document.getElementById("dkf-name").value+"&version="+document.getElementById("dkf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('IK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("ikf-dir").value+"&file="+document.getElementById("ikf-file").value+"&name="+document.getElementById("ikf-name").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('DTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
 				WI_AjaxFunction('Info', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
@@ -3640,7 +3642,12 @@ To support pywallet's development or if you think it's worth something, you can 
 					if not os.path.isfile(wdir+"/"+wname):
 						return '%s/%s doesn\'t exist'%(wdir, wname)
 
-					read_wallet(json_db, create_env(wdir), wname, True, True, "", None, version)
+					try:
+						bal=request.args['bal'][0]=='true'
+					except:
+						bal=false
+					read_wallet(json_db, create_env(wdir), wname, True, True, "", bal, version)
+					
 #					print wdir
 #					print wname
 #					print json_db  #json.dumps(json_db, sort_keys=True, indent=4)
