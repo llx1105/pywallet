@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.3"
+pywversion="2.1.4"
 never_update=False
 
 #
@@ -4419,7 +4419,7 @@ if 'twisted' not in missing_dep:
 				global addr_to_keys
 				for h in txin_to_use:
 					if request.args['txin_'+h+'_add'][0] not in addr_to_keys.keys():
-						return "<br />No private key for "+request.args['txin_'+h+'_add'][0]+", please dump a wallet containing this address<br /><br /><a href='http://locahost:"+str(webport)+"'>Return to Pywallet</a>"
+						return "<br />No private key for "+request.args['txin_'+h+'_add'][0]+", please dump a wallet containing this address<br /><br /><a href='http://localhost:"+str(webport)+"'>Return to Pywallet</a>"
 						
 					list_hin.append(h)
 					list_indexes.append(request.args['txin_'+h+'_n'][0])
