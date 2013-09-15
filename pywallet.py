@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.4"
+pywversion="2.1.5"
 never_update=False
 
 #
@@ -112,7 +112,7 @@ def systype():
 	elif platform.system() == "Windows":
 		return 'Win'
 	return 'Linux'
-		
+
 def determine_db_dir():
 	if wallet_dir in "":
 		if platform.system() == "Darwin":
@@ -740,7 +740,7 @@ class Crypter_pycrypto( object ):
 
 	def Encrypt(self, data):
 		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).encrypt(data)[0:32]
- 
+
 	def Decrypt(self, data):
 		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).decrypt(data)[0:32]
 
@@ -823,7 +823,7 @@ class Crypter_pure(object):
 	def Encrypt(self, data):
 		mode, size, cypher = self.m.encrypt(data, self.cbc, self.chKey, self.sz, self.chIV)
 		return ''.join(map(chr, cypher))
- 
+
 	def Decrypt(self, data):
 		chData = [ord(i) for i in data]
 		return self.m.decrypt(chData, self.sz, self.cbc, self.chKey, self.sz, self.chIV)
@@ -895,7 +895,7 @@ class Point( object ):
 		self.__order = order
 		if self.__curve: assert self.__curve.contains_point( x, y )
 		if order: assert self * order == INFINITY
- 
+
 	def __add__( self, other ):
 		if other == INFINITY: return self
 		if self == INFINITY: return other
@@ -963,10 +963,10 @@ class Point( object ):
 
 	def curve( self ):
 		return self.__curve
-	
+
 	def order( self ):
 		return self.__order
-		
+
 INFINITY = Point( None, None, None )
 
 def inverse_mod( a, m ):
@@ -984,12 +984,13 @@ class Signature( object ):
 	def __init__( self, r, s ):
 		self.r = r
 		self.s = s
-		
+
 class Public_key( object ):
-	def __init__( self, generator, point ):
+	def __init__( self, generator, point, c=None ):
 		self.curve = generator.curve()
 		self.generator = generator
 		self.point = point
+		self.compressed = c
 		n = generator.order()
 		if not n:
 			raise RuntimeError, "Generator point must have order."
@@ -1011,6 +1012,17 @@ class Public_key( object ):
 		xy = u1 * G + u2 * self.point
 		v = xy.x() % n
 		return v == r
+
+	def ser(self):
+		if self.compressed:
+			pk=('%02x'%(2+(self.point.y()&1))) + '%064x' % self.point.x()
+		else:
+			pk='04%064x%064x' % (self.point.x(), self.point.y())
+
+		return pk.decode('hex')
+
+	def get_addr(self, v=0):
+		return public_key_to_bc_address(self.ser(), v)
 
 class Private_key( object ):
 	def __init__( self, public_key, secret_multiplier ):
@@ -1123,7 +1135,7 @@ __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 __b58base = len(__b58chars)
 
 def b58encode(v):
-	""" encode v, which is a string of bytes, to base58.		
+	""" encode v, which is a string of bytes, to base58.
 	"""
 
 	long_value = 0L
@@ -1384,7 +1396,7 @@ def readpartfile(fd, offset, length):   #make everything 512*n because of window
 	os.lseek(fd, new_offset, os.SEEK_SET)
 	d=os.read(fd, big_length)
 	return d[rest:rest+length]
-	
+
 def recov_ckey(fd, offset):
 	d=readpartfile(fd, offset-49, 122)
 	me=multiextract(d, [1,48,4,4,1])
@@ -1422,7 +1434,7 @@ def recov_uckey(fd, offset):
 		checks.append([2, '02010104'])
 	elif d[-7]=='\x46':
 		d=readpartfile(fd, offset-282, 286)
-		
+
 		me=multiextract(d, [2,1,4,1,32,173,65,1,2,5])
 
 		checks.append([0, '8201'])
@@ -1439,15 +1451,15 @@ def recov_uckey(fd, offset):
 
 def starts_with(s, b):
 	return len(s)>=len(b) and s[:len(b)]==b
-	
+
 
 def recov(device, passes, size=102400, inc=10240, outputdir='.'):
 	if inc%512>0:
 		inc-=inc%512   #inc must be 512*n on Windows... Don't ask me why...
-		
+
 	nameToDBName={'mkey':'\x09\x00\x01\x04mkey','ckey':'\x27\x00\x01\x04ckey','key':'\x00\x01\x03key',}
 
-	
+
 	if not starts_with(device, 'PartialRecoveryFile:'):
 		r=search_patterns_on_disk(device, size, inc, map(lambda x:nameToDBName[x], ['mkey', 'ckey', 'key']))
 		f=open(outputdir+'/pywallet_partial_recovery_%d.dat'%ts(), 'w')
@@ -1471,7 +1483,7 @@ def recov(device, passes, size=102400, inc=10240, outputdir='.'):
 	except:
 		otype=os.O_RDONLY
 	fd = os.open(device, otype)
-	
+
 
 	mkeys=[]
 	crypters=[]
@@ -1506,10 +1518,10 @@ def recov(device, passes, size=102400, inc=10240, outputdir='.'):
 		uckeys.append(s[4])
 	print "Found", len(uckeys), 'possible unencrypted keys'
 
-	
+
 	os.close(fd)
-	
-	
+
+
 	list_of_possible_keys_per_master_key=dict(map(lambda x:[x[1],[]], mkeys))
 	for cko,ck in ckeys:
 		tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
@@ -1612,14 +1624,14 @@ def recov(device, passes, size=102400, inc=10240, outputdir='.'):
 		elif not refused_to_test_all_pps:
 			print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
 			print "Try another password, check the size of your partition or seek help"
-	
+
 
 	uncrypted_ckeys=filter(lambda x:x!=None, map(lambda x:x[1].privkey, ckeys))
 	uckeys.extend(uncrypted_ckeys)
-	
+
 	return uckeys
 
-	
+
 
 
 def ts():
@@ -1660,7 +1672,7 @@ def first_read(device, size, prekeys, inc=10000):
 			ETAts = size/speed + t0
 			d = datetime.fromtimestamp(ETAts)
 			print(d.strftime("   ETA: %H:%M:%S"))
-		
+
 		try:
 			data = os.read (fd, inc)
 		except Exception as exc:
@@ -1704,7 +1716,7 @@ def shrink_intervals(device, ranges, prekeys, inc=1000):
 		for k in range(len(mini_blocks)/2):
 			mini_blocks[2*k] -= len(prekey) +1
 			mini_blocks[2*k+1] += len(prekey) +1
-	
+
 
 			bi = mini_blocks[2*k]
 			bf = mini_blocks[2*k+1]
@@ -1989,7 +2001,7 @@ def open_wallet(db_env, walletfile, writable=False):
 	if r is not None:
 		logging.error("Couldn't open wallet.dat/main. Try quitting Bitcoin and running this again.")
 		sys.exit(1)
-	
+
 	return db
 
 def inversetxid(txid):
@@ -2023,7 +2035,7 @@ def parse_wallet(db, item_callback):
 		d['scriptPubKey'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
 		return d
 
-	
+
 	for (key, value) in db.items():
 		d = { }
 
@@ -2104,7 +2116,7 @@ def parse_wallet(db, item_callback):
 				d['nDerivationMethod'] = vds.read_uint32()
 				d['nDerivationIterations'] = vds.read_uint32()
 				d['otherParams'] = vds.read_string()
-			
+
 			item_callback(type, d)
 
 		except Exception, e:
@@ -2114,7 +2126,7 @@ def parse_wallet(db, item_callback):
 			print("key data in hex: %s"%key.encode('hex_codec'))
 			print("value data in hex: %s"%value.encode('hex_codec'))
 			sys.exit(1)
-	
+
 def delete_from_wallet(db_env, walletfile, typedel, kd):
 	db = open_wallet(db_env, walletfile, True)
 	kds = BCDataStream()
@@ -2155,7 +2167,7 @@ def delete_from_wallet(db_env, walletfile, typedel, kd):
 						if keydel == kds.read_string():
 							db.delete(key)
 							deleted_items+=1
-				
+
 
 	db.close()
 	return deleted_items
@@ -2174,7 +2186,7 @@ def merge_keys_lists(la, lb):
 
 	for k,j in lr.items():
 		llr.append([k,j])
-	
+
 	return llr
 
 def merge_wallets(wadir, wa, wbdir, wb, wrdir, wr, passphrase_a, passphrase_b, passphrase_r):
@@ -2279,17 +2291,17 @@ def update_wallet(db, types, datas, paramsAreLists=False):
 	data's __key__, __value__ and __type__ are ignored; only the primary data
 	fields are used.
 	"""
-	
+
 	if not paramsAreLists:
 		types=[types]
 		datas=[datas]
-		
+
 	if len(types)!=len(datas):
 		raise Exception("UpdateWallet: sizes are different")
 
 	for it,type in enumerate(types):
 		data=datas[it]
-		
+
 		d = data
 		kds = BCDataStream()
 		vds = BCDataStream()
@@ -2544,7 +2556,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 			update_wallet(db, 'pool', { 'public_key' : p.decode('hex'), 'n' : cpt, 'nTime' : ts(), 'nVersion':80100 })
 			cpt+=1
 
-		
+
 
 	db.close()
 
@@ -3209,7 +3221,7 @@ def html_wui(listcontent,uptodate_text):
 </body>
 </html>
 """
-	
+
 def WI_FormInit(title, action, divname):
 	return "<li><h3>%s</h3>"%title
 	return '<style>#h'+divname+':hover{color:red;}</style><h3 id="h'+divname+'" onClick="document.getElementById(\''+divname+'\').style.display=(document.getElementById(\''+divname+'\').style.display==\'none\')?\'block\':\'none\';document.getElementById(\'iconOF_'+divname+'\').innerHTML=image_showdiv(\''+divname+'\');"><span style="width:21px;" id="iconOF_'+divname+'"><img src="http://creation-entreprise.comprendrechoisir.com/img/puce_tab_down.png" /></span>&nbsp;&nbsp;'+title+'</h3><div id="'+divname+'"><form style="margin-left:15px;" action="'+action+'" method=get>'
@@ -3222,7 +3234,7 @@ def WI_InputPassword(label, name, id, value, size=30):
 
 def WI_Submit(value, local_block, local_button, function):
 	return """<br /><a href="#" class="button-style"  onClick="document.getElementById('content').style.width='500px';document.getElementById('sidebar').style.display='block';%s();return false;">%s</a>"""%(function,value)
-	
+
 def WI_CloseButton(local_block, local_button):
 	return '<input type=button value="Close" onClick="document.getElementById(\'%s\').style.display=\'none\';document.getElementById(\'%s\').style.display=\'none\';" id="%s" style="display:none;" />'%(local_block, local_button, local_button)
 
@@ -3240,7 +3252,7 @@ def WI_Checkbox(name, value, id, other, label):
 
 def WI_Endiv(t,name,title, desc,hidden=False):
 	return '<div id="'+name+'" style="display:'+X_if_else('none',hidden,'block')+';"><div id="box1"><h2 class="title"><a href="#">'+title+'</a></h2>'+X_if_else('<p>'+desc+'</p>',desc!='','')+'</div><div ><ul class="style1">'+t+'</ul></div></div>'
-	
+
 def WI_AjaxFunction(name, command_when_ready, query_string, command_until_ready):
 	return '\n\
 function ajax%s(){\n\
@@ -3335,14 +3347,14 @@ def import_csv_keys(filename, wdir, wname, nbremax=9999999):
 
 	read_wallet(json_db, db_env, wname, True, True, "", None, -1, True)  #Fill the pool if empty
 
-	return True	
+	return True
 
 def dep_text_aboutpage(val):
 	if val:
 		return "<span style='color:#bb0000;'>Not found</span>"
 	else:
 		return "<span style='color:#00bb00;'>Found</span>"
-		
+
 CTX_adds=''
 
 if 'twisted' not in missing_dep:
@@ -3357,7 +3369,7 @@ if 'twisted' not in missing_dep:
 
 				uptodate=md5_last_pywallet[1]==md5_pywallet
 				checking_finished=bool(md5_last_pywallet[0])
-		
+
 				color="#DDDDFF"
 				if checking_finished:
 					if uptodate:
@@ -3368,10 +3380,10 @@ if 'twisted' not in missing_dep:
 				check_version_text = \
  X_if_else(
 	X_if_else(
-		'Pywallet is up-to-date', 
-		uptodate, 
-		'Pywallet is <span style="color:red;font-weight:none;">not</span> up-to-date<br /><a href="#" onclick="ajaxUpdatePyw();return false;">Click to update</a>'), 
-	checking_finished, 
+		'Pywallet is up-to-date',
+		uptodate,
+		'Pywallet is <span style="color:red;font-weight:none;">not</span> up-to-date<br /><a href="#" onclick="ajaxUpdatePyw();return false;">Click to update</a>'),
+	checking_finished,
 	'Checking version...'
  )
 
@@ -3527,7 +3539,7 @@ if 'twisted' not in missing_dep:
 							WI_CloseButton('BalanceDiv', 'gb-close') + \
 							WI_ReturnDiv('BalanceDiv') + \
 							WI_FormEnd()
-							
+
 				global CTX_adds, addr_to_keys
 				CTX_adds2=CTX_adds.split('|')+addr_to_keys.keys()
 
@@ -3592,7 +3604,7 @@ if 'twisted' not in missing_dep:
 
 
 				page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + CPPForm + DWForm + MWForm + DKForm + IKForm + DTxForm + InfoForm + ImportForm + ImportTxForm + DeleteForm + BalanceForm + Misc + '</body></html>'
-				
+
 				AboutPage="\
 Pywallet is a tool to manage wallet files, developped by jackjack. <a href='https://bitcointalk.org/index.php?topic=34028'>Support thread</a> is on bitcointalk.<br />\
 <br />\
@@ -3604,7 +3616,7 @@ To support pywallet's development or if you think it's worth something, you can 
 				\
 <br /><br /><b>Pywallet path:</b>&nbsp;&nbsp;&nbsp;"+pyw_path+"/"+pyw_filename+"\
 				"
-				
+
 				return html_wui(Javascript + \
 					WI_Endiv(DWForm+DKForm+DTxForm, 'DumpPage', 'Dump', '') + \
 					WI_Endiv(ImportForm+IKForm+MWForm+ImportTxForm+ImportROForm,'ImportPage', 'Import', "Don't forget to close Bitcoin when you modify your wallet", True) + \
@@ -3615,8 +3627,8 @@ To support pywallet's development or if you think it's worth something, you can 
 					WI_Endiv(AboutPage,'AboutPage','About','', True)
 				,check_version_text
 				)
-				
-				
+
+
 				return page
 
 		 def getChild(self, name, request):
@@ -3647,7 +3659,7 @@ To support pywallet's development or if you think it's worth something, you can 
 					except:
 						bal=false
 					read_wallet(json_db, create_env(wdir), wname, True, True, "", bal, version)
-					
+
 #					print wdir
 #					print wname
 #					print json_db  #json.dumps(json_db, sort_keys=True, indent=4)
@@ -3860,7 +3872,7 @@ def ct(l_prevh, l_prevn, l_prevsig, l_prevpubkey, l_value_out, l_pubkey_out, is_
 			txin_ret += oldScriptPubkey
 		else:
 			txin_ret += "00"
-			
+
 		ret += txin_ret
 		ret += "ffffffff"
 
@@ -3884,14 +3896,14 @@ def ct(l_prevh, l_prevn, l_prevsig, l_prevpubkey, l_value_out, l_pubkey_out, is_
 	if not scriptSig:
 		ret += "01000000"
 	return ret
-	
+
 def create_transaction(secret_key, hashes_txin, indexes_txin, pubkey_txin, prevScriptPubKey, amounts_txout, scriptPubkey):
 	li1 = len(secret_key)
 	li2 = len(hashes_txin)
 	li3 = len(indexes_txin)
 	li4 = len(pubkey_txin)
 	li5 = len(prevScriptPubKey)
-	
+
 	if li1 != li2 or li2 != li3 or li3 != li4 or li4 != li5:
 		print("Error in the number of tx inputs")
 		exit(0)
@@ -3909,7 +3921,7 @@ def create_transaction(secret_key, hashes_txin, indexes_txin, pubkey_txin, prevS
 		sig_txin.append(sign_message(secret_key[i].decode('hex'), ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey, i, prevScriptPubKey[i]), True)+"01")
 		i+=1
 
-	tx = ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey)	
+	tx = ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey)
 	hashtx = Hash(tx.decode('hex')).encode('hex')
 
 	for i in range(len(sig_txin)):
@@ -3923,7 +3935,7 @@ def create_transaction(secret_key, hashes_txin, indexes_txin, pubkey_txin, prevS
 #	tx += end_of_wallettx([], int(time.time()))
 #	return [inverse_str(hashtx), "027478" + hashtx, tx]
 	return [inverse_str(hashtx), "", tx]
-	
+
 def inverse_str(string):
 	ret = ""
 	for i in range(len(string)/2):
@@ -3986,7 +3998,7 @@ def bc_address_to_available_tx(address, testnet=False):
 
 		#hashblock = read_table(cell[i][1], '/block/', '">')[1]
 		#blocknumber = read_table(cell[i][1], 'Block ', '</a>')[1]
-	
+
 		txin_amounts[txhash+no_tx] = round(float(cell[i][2]), 8)
 
 #		if cell[i][3][:4] in 'Sent' and io in 'o':
@@ -4086,7 +4098,7 @@ class tx():
 		global json_db
 		txcopy=self.copy()
 		txcopy.hashtypeone(i, self.ins[n]['oldscript'])
-		
+
 		sec=''
 		for k in json_db['keys']:
 		  if k['addr']==self.ins[n]['addr'] and 'hexsec' in k:
@@ -4136,7 +4148,7 @@ class tx():
 
 			else:
 				ret += "00"
-			
+
 			ret += "ffffffff"
 
 		ret += "%02x"%len(self.outs)
@@ -4220,11 +4232,11 @@ Amount: <input value='0' onchange='totalout=Math.round(("+serouts+")*100000000);
 \
 \
 <br />"+X_if_else("<input type=button id='button_txout_"+str(i)+"' value='Add a txout' onclick='document.getElementById(\"txout_"+str(i+X_if_else(0,i==nbretxouts-1,1))+"\").style.display=\"block\";document.getElementById(\"button_txout_"+str(i)+"\").style.display=\"none\";' />",i>=2,"")+"</span>"
-			
+
 			ret+=txouts
 			ret+="<input type=submit value='Create' /></form>"
 #			ret+=WI_Submit('Create', '', '', 'ajaxCTX2')
-			
+
 			return ret
 
 if 'twisted' not in missing_dep:
@@ -4257,7 +4269,7 @@ if 'twisted' not in missing_dep:
 						need = int(request.args['need'][0])
 					except:
 						need = 1
-				
+
 					ret = ""
 
 					if sec is not '':
@@ -4304,7 +4316,7 @@ if 'twisted' not in missing_dep:
 								ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
 							except:
 								ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
-					
+
 					return ret
 
 			 except:
@@ -4347,7 +4359,7 @@ if 'twisted' not in missing_dep:
 						print(d)
 						update_wallet(db, "tx", d)
 						i+=1
-	
+
 					db.close()
 
 					return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]), i, iais(i), wdir, wname)
@@ -4373,7 +4385,7 @@ if 'twisted' not in missing_dep:
 				CTX_adds=adds
 			except:
 				return "You must provide at least one address to see the transaction you can spend. Divided by |"
-			
+
 			ret=""
 			ret=listtx_txt(adds)
 			return "Refresh to display available incoming transactions"
@@ -4386,7 +4398,7 @@ if 'twisted' not in missing_dep:
 			#CT?sec=s&hashesin=h&indexes=1&pubkeys=p&prevspk=r&amounts=2453628&spk=spk#tbend
 			global txin_amounts, json_db
 			display = ""
-			
+
 
 
 			try:
@@ -4396,9 +4408,9 @@ if 'twisted' not in missing_dep:
 				TN=""
 
 			try:
-			
+
 				list_sec, list_hin, list_indexes, list_pubs, list_scriptin, list_outam, list_scriptout, list_amin = [[] for i in range(8)]
-				
+
 				txin_to_use=[]
 				txouts_nos=[]
 				txouts_not_empty=[]
@@ -4415,19 +4427,19 @@ if 'twisted' not in missing_dep:
 					list_outam.append(request.args['txout_am_'+no][0])
 					list_scriptout.append(request.args['txout_script_'+no][0])
 
-						
+
 				global addr_to_keys
 				for h in txin_to_use:
 					if request.args['txin_'+h+'_add'][0] not in addr_to_keys.keys():
 						return "<br />No private key for "+request.args['txin_'+h+'_add'][0]+", please dump a wallet containing this address<br /><br /><a href='http://localhost:"+str(webport)+"'>Return to Pywallet</a>"
-						
+
 					list_hin.append(h)
 					list_indexes.append(request.args['txin_'+h+'_n'][0])
 					list_scriptin.append(request.args['txin_'+h+'_script'][0])
 					list_sec.append(addr_to_keys[request.args['txin_'+h+'_add'][0]][0])
 					list_pubs.append(addr_to_keys[request.args['txin_'+h+'_add'][0]][1])
 					list_amin.append(request.args['txin_'+h+'_amin'][0])
-			
+
 				sec=",".join(list_sec)
 				hashesin=",".join(list_hin)
 				indexes=",".join(list_indexes)
@@ -4469,7 +4481,7 @@ if 'twisted' not in missing_dep:
 				except:
 					aaa = ""
 				display += ('%d: <a href="http://blockexplorer.com/'+TN+'/tx/%s#o%d">%s #%d</a>%s<br />')%(i, hashes_txin[i], indexes_txin[i], hashes_txin[i], indexes_txin[i], aaa)
-		
+
 			display += "<br /><br />Outputs:<br />"
 			sum_out = 0
 			for i in range(len(spk_txout)):
@@ -4491,7 +4503,7 @@ if 'twisted' not in missing_dep:
 #			display += ("tx_k:    "+tx[1])
 #			display += "<br />"
 			display += ("Raw transaction:       "+tx[2])
-		
+
 			display += "</pre><br />"
 
 
@@ -4508,7 +4520,7 @@ if 'twisted' not in missing_dep:
 				testnet=True
 			except:
 				testnet=False
-			list_avtx = {}	
+			list_avtx = {}
 			i = 0
 
 			try:
@@ -4523,13 +4535,13 @@ if 'twisted' not in missing_dep:
 				display += write_avtx(list_avtx, testnet)
 			except:
 				display="You must provide at least one address to see the transaction you can spend.<br /><a href='CTTest?addresses=1BAdzvknPux2zqG2eNawvgitCW1aqwE4bb'>Like this</a>"
-		
+
 			return display
 
 		def render_POST(self, request):
 			return self.render_GET(request)
 
-				 
+
 	class WIImport(resource.Resource):
 
 		 def render_GET(self, request):
@@ -4540,7 +4552,7 @@ if 'twisted' not in missing_dep:
 										wdir=request.args['dir'][0]
 										wname=request.args['name'][0]
 										label=request.args['label'][0]
-										
+
 										db_env = create_env(wdir)
 										db = open_wallet(db_env, wname, writable=True)
 										update_wallet(db, 'ckey', { 'public_key' : pub.decode('hex'), 'encrypted_private_key' : random_string(96).decode('hex') })
@@ -4551,7 +4563,7 @@ if 'twisted' not in missing_dep:
 										return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" not imported"
 			 except:
                                 pass
-                        
+
 			 try:
 
 					wdir=request.args['dir'][0]
@@ -4570,7 +4582,7 @@ if 'twisted' not in missing_dep:
 						return "File "+X_if_else("", ret, "not ")+"imported"
 
 
-				
+
 
 
 					if format in 'reg':
@@ -4627,7 +4639,7 @@ if 'twisted' not in missing_dep:
 
 					if not reserve:
 						update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
-	
+
 					db.close()
 
 					return "<pre>Address: %s\nPrivkey: %s\nHexkey: %s\nKey (%scrypted, %scompressed) imported in %s/%s<pre>" % (addr, SecretToASecret(secret, compressed), secret.encode('hex'), X_if_else("",tocrypt,"un"), X_if_else("",compressed,"un"), wdir, wname)
@@ -4714,7 +4726,7 @@ def clone_wallet(parentPath, clonePath):
 	update_wallet(db, types, datas, True)
 	db.close()
 	print "Wallet successfully cloned to:\n   %s"%clonePath
-	
+
 import thread
 md5_last_pywallet = [False, ""]
 
@@ -4726,7 +4738,7 @@ from optparse import OptionParser
 
 if __name__ == '__main__':
 
-	
+
 	parser = OptionParser(usage="%prog [options]", version="%prog 1.1")
 
 	parser.add_option("--passphrase", dest="passphrase",
@@ -4738,20 +4750,20 @@ if __name__ == '__main__':
 	parser.add_option("--dumpwithbalance", dest="dumpbalance", action="store_true",
 		help="includes balance of each address in the json dump, takes about 2 minutes per 100 addresses")
 
-	parser.add_option("--importprivkey", dest="key", 
+	parser.add_option("--importprivkey", dest="key",
 		help="import private key from vanitygen")
 
-	parser.add_option("--importhex", dest="keyishex", action="store_true", 
+	parser.add_option("--importhex", dest="keyishex", action="store_true",
 		help="KEY is in hexadecimal format")
 
-	parser.add_option("--datadir", dest="datadir", 
+	parser.add_option("--datadir", dest="datadir",
 		help="wallet directory (defaults to bitcoin default)")
 
-	parser.add_option("--wallet", dest="walletfile", 
+	parser.add_option("--wallet", dest="walletfile",
 		help="wallet filename (defaults to wallet.dat)",
 		default="wallet.dat")
 
-	parser.add_option("--label", dest="label", 
+	parser.add_option("--label", dest="label",
 		help="label shown in the adress book (defaults to '')",
 		default="")
 
@@ -4827,7 +4839,7 @@ if __name__ == '__main__':
 
 	if options.passphrase:
 		passphrase = options.passphrase
-		
+
 	if options.clone_watchonly_from is not None and options.clone_watchonly_to:
 		clone_wallet(options.clone_watchonly_from, options.clone_watchonly_to)
 		exit(0)
@@ -4867,7 +4879,7 @@ if __name__ == '__main__':
 		recov_wallet_name = "recovered_wallet_%s.dat"%ts()
 
 		create_new_wallet(db_env, recov_wallet_name, 32500)
-		
+
 		if passphraseRecov!="I don't want to put a password on the recovered wallet and I know what can be the consequences.":
 			db = open_wallet(db_env, recov_wallet_name, True)
 
@@ -4886,9 +4898,9 @@ if __name__ == '__main__':
 				"salt": NPP_salt
 			})
 			db.close()
-		
+
 		read_wallet(json_db, db_env, recov_wallet_name, True, True, "", False)
-		
+
 		db = open_wallet(db_env, recov_wallet_name, True)
 
 		i = 0
@@ -4901,7 +4913,7 @@ if __name__ == '__main__':
 		db.close()
 
 		print("\n\nThe new wallet %s/%s contains the %d recovered key%s"%(options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
-		
+
 		exit(0)
 
 
@@ -5017,14 +5029,14 @@ if __name__ == '__main__':
 		print "Version mismatch (must be <= %d)" % max_version
 		#exit(1)
 
-	if options.dump:		
+	if options.dump:
 		print json.dumps(json_db, sort_keys=True, indent=4)
 	elif options.key:
 		if json_db['version'] > max_version:
 			print "Version mismatch (must be <= %d)" % max_version
 		elif (options.keyishex is None and options.key in private_keys) or (options.keyishex is not None and options.key in private_hex_keys):
 			print "Already exists"
-		else:	
+		else:
 			db = open_wallet(db_env, determine_db_name(), writable=True)
 
 			if importprivkey(db, options.key, options.label, options.reserve, options.keyishex):
