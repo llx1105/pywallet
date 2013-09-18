@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.5"
+pywversion="2.1.6"
 never_update=False
 
 #
@@ -4903,13 +4903,12 @@ if __name__ == '__main__':
 
 		db = open_wallet(db_env, recov_wallet_name, True)
 
-		i = 0
 		print "\n\nImporting:"
-		for sec in recoveredKeys:
+		for i,sec in enumerate(recoveredKeys):
 			sec=sec.encode('hex')
-			print("\nKey %4d/%d imported:"%(i+1, len(recoveredKeys)))
+			print("\nImporting key %4d/%d:"%(i+1, len(recoveredKeys)))
 			importprivkey(db, sec, "recovered: %s"%sec, None, True)
-			i += 1
+			importprivkey(db, sec+'01', "recovered: %s"%sec, None, True)
 		db.close()
 
 		print("\n\nThe new wallet %s/%s contains the %d recovered key%s"%(options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
