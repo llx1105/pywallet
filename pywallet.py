@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #-*- coding: utf-8 -*-
-pywversion="2.1.6"
+pywversion="2.1.7"
 never_update=False
 
 #
@@ -76,7 +76,7 @@ private_hex_keys = []
 passphrase = ""
 global_merging_message = ["",""]
 
-balance_site = 'http://bitcoin.site50.net/balance.php?adresse'
+balance_site = 'http://jackjack.alwaysdata.net/balance/index.php?address'
 aversions = {};
 for i in range(256):
 	aversions[i] = "version %d" % i;
