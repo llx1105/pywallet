@@ -19,7 +19,10 @@ missing_dep = []
 try:
 	from bsddb.db import *
 except:
-	missing_dep.append('bsddb')
+	try:
+		from bsddb3.db import *
+	except:
+		missing_dep.append('bsddb')
 
 import os, sys, time, re
 pyw_filename = os.path.basename(__file__)
