@@ -4986,10 +4986,6 @@ if __name__ == '__main__':
 		parser.print_help()
 		exit(0)
 
-	if options.testnet:
-		db_dir += "/testnet"
-		addrtype = 111
-
 	if options.namecoin or options.otherversion is not None:
 		if options.datadir is None and options.keyinfo is None:
 			print("You must provide your wallet directory")
@@ -5006,6 +5002,10 @@ if __name__ == '__main__':
 		exit(0)
 
 	db_dir = determine_db_dir()
+
+	if options.testnet:
+		db_dir += "/testnet3"
+		addrtype = 111
 
 	db_env = create_env(db_dir)
 
