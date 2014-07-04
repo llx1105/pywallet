@@ -79,7 +79,7 @@ private_hex_keys = []
 passphrase = ""
 global_merging_message = ["",""]
 
-balance_site = 'http://jackjack.alwaysdata.net/balance/index.php?address'
+balance_site = 'https://blockchain.info/q/addressbalance/'
 aversions = {};
 for i in range(256):
 	aversions[i] = "version %d" % i;
@@ -2684,14 +2684,8 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtyp
 	return True
 
 def balance(site, address):
-	page=urllib.urlopen("%s=%s" % (site, address))
-	json_acc = json.loads(page.read().split("<end>")[0])
-	if json_acc['0'] == 0:
-		return "Invalid address"
-	elif json_acc['0'] == 2:
-		return "Never used"
-	else:
-		return json_acc['balance']
+	page=urllib.urlopen("%s%s" % (site, address))
+	return page.read()
 
 def read_jsonfile(filename):
 	filin = open(filename, 'r')
