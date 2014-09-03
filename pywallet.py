@@ -2472,7 +2472,7 @@ def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transact
 			addr = public_key_to_bc_address(d['public_key'])
 			compressed = d['public_key'][0] != '\04'
 			sec = SecretToASecret(PrivKeyToSecret(d['private_key']), compressed)
-			hexsec = ASecretToSecret(sec).encode('hex')[:32]
+			hexsec = ASecretToSecret(sec)[:32].encode('hex')
 			private_keys.append(sec)
 			addr_to_keys[addr]=[hexsec, d['public_key'].encode('hex')]
 			json_db['keys'].append({'addr' : addr, 'sec' : sec, 'hexsec' : hexsec, 'secret' : hexsec, 'pubkey':d['public_key'].encode('hex'), 'compressed':compressed, 'private':d['private_key'].encode('hex')})
