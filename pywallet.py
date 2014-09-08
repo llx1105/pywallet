@@ -742,7 +742,7 @@ class Crypter_pycrypto( object ):
 		self.chIV = iv[0:16]
 
 	def Encrypt(self, data):
-		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).encrypt(data)[0:32]
+		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).encrypt(append_PKCS7_padding(data))
 
 	def Decrypt(self, data):
 		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).decrypt(data)[0:32]
@@ -824,7 +824,7 @@ class Crypter_pure(object):
 		self.chIV = [ord(i) for i in iv]
 
 	def Encrypt(self, data):
-		mode, size, cypher = self.m.encrypt(data, self.cbc, self.chKey, self.sz, self.chIV)
+		mode, size, cypher = self.m.encrypt(append_PKCS7_padding(data), self.cbc, self.chKey, self.sz, self.chIV)
 		return ''.join(map(chr, cypher))
 
 	def Decrypt(self, data):
@@ -2246,10 +2246,10 @@ def merge_wallets(wadir, wa, wbdir, wb, wrdir, wr, passphrase_a, passphrase_b, p
 
 
 	if len(passphrase_r)>0:
-		NPP_salt=random_string(16).decode('hex')
+		NPP_salt=os.urandom(8)
 		NPP_rounds=int(50000+random.random()*20000)
 		NPP_method=0
-		NPP_MK=random_string(64).decode('hex')
+		NPP_MK=os.urandom(32)
 
 		crypter.SetKeyFromPassphrase(passphrase_r, NPP_salt, NPP_rounds, NPP_method)
 		NPP_EMK = crypter.Encrypt(NPP_MK)
@@ -4880,10 +4880,10 @@ if __name__ == '__main__':
 		if passphraseRecov!="I don't want to put a password on the recovered wallet and I know what can be the consequences.":
 			db = open_wallet(db_env, recov_wallet_name, True)
 
-			NPP_salt=random_string(16).decode('hex')
+			NPP_salt=os.urandom(8)
 			NPP_rounds=int(50000+random.random()*20000)
 			NPP_method=0
-			NPP_MK=random_string(64).decode('hex')
+			NPP_MK=os.urandom(32)
 			crypter.SetKeyFromPassphrase(passphraseRecov, NPP_salt, NPP_rounds, NPP_method)
 			NPP_EMK = crypter.Encrypt(NPP_MK)
 			update_wallet(db, 'mkey', {
