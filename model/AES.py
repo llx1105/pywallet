@@ -6,6 +6,7 @@
 ########################
 
 # from the SlowAES project, http://code.google.com/p/slowaes (aes.py)
+from lib.dependency import *
 ## 加密
 def append_PKCS7_padding(s):
     """return s padded to a multiple of 16-bytes by PKCS7 padding"""

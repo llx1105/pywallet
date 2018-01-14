@@ -204,7 +204,7 @@ def recov(device, passes, size=102400, inc=10240, outputdir='.'):
     try:
         otype = os.O_RDONLY | os.O_BINARY
     except:
-        o
+        otype = os.O_RDONLY
     fd = os.open(device, otype)
 
     mkeys = []
