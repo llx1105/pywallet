@@ -20,7 +20,7 @@ from model.key import *
 from model.recover import *
 from model.tx import *
 from model.wallet import *
-from webui import *
+from interface import *
 
 import thread
 from optparse import OptionParser
