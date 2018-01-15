@@ -77,7 +77,7 @@ class KEY:
 
 
 # hexprivate key to encodedbase58
-def SecretToASecret(secret, compressed=False):
+def SecretToASecret(secret, compressed=False, addrtype=0):
     # 主要用来表示ascii码对应的字符他的输入时数字
     prefix = chr((addrtype + 128) & 255)
     # if addrtype == 48:  # assuming Litecoin
@@ -87,7 +87,7 @@ def SecretToASecret(secret, compressed=False):
     return EncodeBase58Check(vchIn)
 
 
-def ASecretToSecret(sec):
+def ASecretToSecret(sec, addrtype=0):
     vch = DecodeBase58Check(sec)
     if not vch:
         return False
@@ -242,9 +242,11 @@ def keyinfo(sec, keyishex, coin_type='Bitcoin'):
     addr = public_key_to_bc_address(public_key, addrtype)
 
     print "Address (%s): %s" % (aversions[addrtype], addr)
-    print "Privkey (%s): %s" % (aversions[addrtype], SecretToASecret(secret, compressed))
+    print "Privkey (%s): %s" % (aversions[addrtype], SecretToASecret(secret, compressed, addrtype))
     print "Hexprivkey:   %s" % secret.encode('hex')
     print "Hash160:      %s" % (bc_address_to_hash_160(addr).encode('hex'))
+    if not compressed:
+        print "if you want compressed Address and Private key, add '01' at the end of your key"
 
     return True
 

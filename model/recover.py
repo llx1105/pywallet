@@ -267,14 +267,12 @@ def recov(device, passes, size=102400, inc=10240, outputdir='.'):
                 sys.stdout.write("\n    with passphrase #" + str(ppi + 1) + "  ")
                 sys.stdout.flush()
                 failures_in_a_row = 0
-                print "SKFP params:", pp, "1", mk.salt, "2", mk.iterations, "3", mk.method, "4", crypter
                 res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
                 if res == 0:
                     print "Unsupported derivation method"
                     sys.exit(1)
                 masterkey = crypter.Decrypt(mk.encrypted_key)
                 crypter.SetKey(masterkey)
-                print 'after'
                 for ck in list_of_possible_keys:
                     if cpt % 10 == 9 and failures_in_a_row == 0:
                         sys.stdout.write('.')

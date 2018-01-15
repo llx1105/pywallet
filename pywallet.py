@@ -158,7 +158,13 @@ def bool_to_int(b):
 
 # wallet.dat reader / writer
 def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtype):
-    if options.coin_type:
+    global addrtype
+    if options.coin_type is None:
+        options.coin_type = 'Bitcoin'
+    if len(get_keys(aversions, options.coin_type.capitalize())) is 0:
+        print("please input an valid coin type e.g. bitcoin/litecoin")
+        exit(0)
+    else:
         addrv = get_keys(aversions, options.coin_type.capitalize())[-1]
     if keyishex is None:
         pkey = regenerate_key(sec)
@@ -180,11 +186,11 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtyp
     secret = GetSecret(pkey)
     private_key = GetPrivKey(pkey, compressed)
     public_key = GetPubKey(pkey, compressed)
-    addr = public_key_to_bc_address(public_key)
+    addr = public_key_to_bc_address(public_key, addrv)
 
     if verbose:
         print "Address (%s): %s" % (aversions[addrv], addr)
-        print "Privkey (%s): %s" % (aversions[addrv], SecretToASecret(secret, compressed))
+        print "Privkey (%s): %s" % (aversions[addrv], SecretToASecret(secret, compressed, addrv))
         print "Hexprivkey: %s" % (secret.encode('hex'))
         print "Hash160: %s" % (bc_address_to_hash_160(addr).encode('hex'))
         if not compressed:
@@ -380,11 +386,15 @@ if __name__ == '__main__':
         if options.recov_size is None or options.recov_device is None or options.recov_outputdir is None:
             print("You must provide the device, the number of bytes to read and the output directory")
             exit(0)
+        if options.coin_type is None:
+            options.coin_type = 'Bitcoin'
+        if len(get_keys(aversions, options.coin_type.capitalize())) is 0:
+            print("please input an valid coin type e.g. bitcoin/litecoin")
+            exit(0)
         device = options.recov_device
         if len(device) in [2, 3] and device[1] == ':':
             device = "\\\\.\\" + device
         size = read_device_size(options.recov_size)
-
         passphraseRecov = ''
         while passphraseRecov == '':
             passphraseRecov = raw_input(
@@ -441,6 +451,7 @@ if __name__ == '__main__':
             sec = sec.encode('hex')
             print("\nImporting key %4d/%d:" % (i + 1, len(recoveredKeys)))
             importprivkey(db, sec, "recovered: %s" % sec, None, True)
+            print ("\nCompressed key and address:")
             importprivkey(db, sec + '01', "recovered: %s" % sec, None, True)
         db.close()
 
