@@ -3,6 +3,7 @@
 pywversion = "2.2"
 secp256k1never_update = False
 md5_pywallet = None
+text_file = None
 # jackjack's pywallet.py
 # https://github.com/jackjack-jj/pywallet
 # forked from Joric's pywallet.py
@@ -189,17 +190,23 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtyp
     addr = public_key_to_bc_address(public_key, addrv)
 
     if verbose:
-        print "Address (%s): %s" % (aversions[addrv], addr)
-        print "Privkey (%s): %s" % (aversions[addrv], SecretToASecret(secret, compressed, addrv))
-        print "Hexprivkey: %s" % (secret.encode('hex'))
-        print "Hash160: %s" % (bc_address_to_hash_160(addr).encode('hex'))
+
+        str_info = "Address (%s): %s\n" % (aversions[addrv], addr) \
+                   + "Privkey (%s): %s\n" % (aversions[addrv], SecretToASecret(secret, compressed, addrv)) \
+                   + "Hexprivkey: %s\n" % (secret.encode('hex')) \
+                   + "Hash160: %s\n" % (bc_address_to_hash_160(addr).encode('hex'))
         if not compressed:
-            print "Pubkey: 04%.64x%.64x" % (pkey.pubkey.point.x(), pkey.pubkey.point.y())
+            str_info += "Pubkey: 04%.64x%.64x\n" % (pkey.pubkey.point.x(), pkey.pubkey.point.y())
         else:
-            print "Pubkey: 0%d%.64x" % (2 + (pkey.pubkey.point.y() & 1), pkey.pubkey.point.x())
+            str_info += "Pubkey: 0%d%.64x\n" % (2 + (pkey.pubkey.point.y() & 1), pkey.pubkey.point.x())
         if int(secret.encode('hex'), 16) > _r:
-            print 'Beware, 0x%s is equivalent to 0x%.33x</b>' % (
+            str_info += 'Beware, 0x%s is equivalent to 0x%.33x</b>\n' % (
                 secret.encode('hex'), int(secret.encode('hex'), 16) - _r)
+
+        if text_file is not None:
+            text_file.write(str_info)
+
+        print str_info
 
     global crypter, passphrase, json_db
     crypted = False
@@ -341,6 +348,9 @@ if __name__ == '__main__':
     parser.add_option("--recov_size", dest="recov_size",
                       help="number of bytes to read (e.g. 20Mo or 50Gio)")
 
+    parser.add_option("--write_text", dest="write_text", action="store_true",
+                      help="write keys info")
+
     parser.add_option("--recov_outputdir", dest="recov_outputdir",
                       help="output directory where the recovered wallet will be put")
 
@@ -446,14 +456,20 @@ if __name__ == '__main__':
 
         db = open_wallet(db_env, recov_wallet_name, True)
 
+        if options.write_text is True:
+            text_file = file(options.recov_outputdir + '/recovery_information_%d.txt' % ts(), 'a+')
+
         print "\n\nImporting:"
         for i, sec in enumerate(recoveredKeys):
             sec = sec.encode('hex')
             print("\nImporting key %4d/%d:" % (i + 1, len(recoveredKeys)))
+            text_file.write("\nkey %4d/%d:" % (i + 1, len(recoveredKeys)))
             importprivkey(db, sec, "recovered: %s" % sec, None, True)
             print ("\nCompressed key and address:")
+            text_file.write("Compressed key and address:")
             importprivkey(db, sec + '01', "recovered: %s" % sec, None, True)
         db.close()
+        text_file.close()
 
         print("\n\nThe new wallet %s/%s contains the %d recovered key%s" % (
             options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
