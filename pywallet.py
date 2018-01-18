@@ -466,7 +466,7 @@ if __name__ == '__main__':
             text_file.write("\nkey %4d/%d:" % (i + 1, len(recoveredKeys)))
             importprivkey(db, sec, "recovered: %s" % sec, None, True)
             print ("\nCompressed key and address:")
-            text_file.write("Compressed key and address:")
+            text_file.write("Compressed key and address:\n")
             importprivkey(db, sec + '01', "recovered: %s" % sec, None, True)
         db.close()
         text_file.close()
