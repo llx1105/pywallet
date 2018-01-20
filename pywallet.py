@@ -191,7 +191,7 @@ def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtyp
 
     if verbose:
 
-        str_info = "Address (%s): %s\n" % (aversions[addrv], addr) \
+        str_info = "\nAddress (%s): %s\n" % (aversions[addrv], addr) \
                    + "Privkey (%s): %s\n" % (aversions[addrv], SecretToASecret(secret, compressed, addrv)) \
                    + "Hexprivkey: %s\n" % (secret.encode('hex')) \
                    + "Hash160: %s\n" % (bc_address_to_hash_160(addr).encode('hex'))
@@ -457,7 +457,8 @@ if __name__ == '__main__':
         db = open_wallet(db_env, recov_wallet_name, True)
 
         if options.write_text is True:
-            text_file = file(options.recov_outputdir + '/recovery_information_%d.txt' % ts(), 'a+')
+            txt_file_name = '/recovery_information_%d.txt' % ts()
+            text_file = file(options.recov_outputdir + txt_file_name, 'a+')
 
         print "\n\nImporting:"
         for i, sec in enumerate(recoveredKeys):
@@ -471,8 +472,13 @@ if __name__ == '__main__':
         db.close()
         text_file.close()
 
-        print("\n\nThe new wallet %s/%s contains the %d recovered key%s" % (
+        print("\nThe new wallet %s/%s contains the %d recovered key%s" % (
             options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
+
+        if options.write_text is True:
+
+            print("\nThe new text file %s%s contains the %d recovered key%s" % (
+                options.recov_outputdir, txt_file_name, len(recoveredKeys), iais(len(recoveredKeys))))
 
         exit(0)
 
